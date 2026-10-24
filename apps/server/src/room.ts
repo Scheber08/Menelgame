@@ -1,3 +1,4 @@
+import { decideBot, newBotMemory, type BotMemory } from '@menelgame/bots';
 import {
   actingPlayerId,
   apply,
@@ -10,8 +11,11 @@ import {
 } from '@menelgame/engine';
 import { builtInPacks, standardPack } from '@menelgame/packs';
 import {
+  BOT_NAMES,
   ClientMessageSchema,
+  PLAYER_COLORS,
   withPlayer,
+  type BotLevel,
   type ClientMessage,
   type Deadline,
   type ErrorCode,
@@ -32,6 +36,10 @@ export interface Seat {
   color: string;
   /** Geheimes Reconnect-Token; bleibt im Browser des Spielers. */
   token: string;
+  /** Bot-Platz und seine Stufe; null für Menschen. */
+  bot: BotLevel | null;
+  /** Seit wann ein Mensch keine Verbindung mehr hat. */
+  disconnectedAt: number | null;
 }
 
 /** Dauerhaft gespeicherte Raumdaten (ohne Spielzustand). */
@@ -46,6 +54,10 @@ export interface RoomData {
   dice: DiceConfig;
   paused: boolean;
   deadline: Deadline | null;
+  /** Nach so vielen Sekunden ohne Verbindung spielt ein Bot für den Menschen; null = nie. */
+  botTakeoverSeconds: number | null;
+  /** Nächster Bot-Zug (die Verzögerung macht Bot-Züge für Menschen nachvollziehbar). */
+  botAt: number | null;
   createdAt: number;
 }
 
@@ -80,6 +92,11 @@ export interface RoomHost {
 
 /** So viele Ereignisse bekommt ein Client nach dem (Wieder-)Verbinden. */
 export const RECENT_EVENTS = 300;
+/** Pause vor jedem Bot-Zug, damit Menschen mitlesen können. */
+export const BOT_DELAY_MS = 900;
+/** Abwesende Menschen vertritt ein vorsichtiger Bot. */
+export const STAND_IN_LEVEL: BotLevel = 'easy';
+export const DEFAULT_TAKEOVER_SECONDS = 60;
 
 export function findPack(packId: string): BoardPack | undefined {
   return builtInPacks.find((p) => p.meta.id === packId);
@@ -97,23 +114,36 @@ export function newRoomData(code: string, now: number): RoomData {
     dice: structuredClone(standardPack.dice),
     paused: false,
     deadline: null,
+    botTakeoverSeconds: DEFAULT_TAKEOVER_SECONDS,
+    botAt: null,
     createdAt: now,
   };
 }
 
 /**
- * Ein Spielraum: Lobby, Plätze mit Reconnect-Token, autoritativer Spielzustand über die
- * Engine, Host-Rechte und Uhren. Die Klasse ist frei von Cloudflare-APIs.
+ * Ein Spielraum: Lobby, Plätze mit Reconnect-Token, Bots, autoritativer Spielzustand über
+ * die Engine, Host-Rechte und Uhren. Die Klasse ist frei von Cloudflare-APIs.
  */
 export class Room {
+  private readonly memories = new Map<string, BotMemory>();
+
   constructor(
     private readonly host: RoomHost,
     public data: RoomData,
     public game: GameRecord | null,
-  ) {}
+  ) {
+    // Ältere gespeicherte Räume kannten noch keine Bots.
+    data.botTakeoverSeconds ??= DEFAULT_TAKEOVER_SECONDS;
+    data.botAt ??= null;
+    for (const seat of data.seats) {
+      seat.bot ??= null;
+      seat.disconnectedAt ??= null;
+    }
+  }
 
   view(): RoomView {
     const online = new Set(this.host.connections().map((c) => c.seatId));
+    const now = this.host.now();
     return {
       code: this.data.code,
       status: this.data.status,
@@ -122,14 +152,17 @@ export class Room {
         id: s.id,
         name: s.name,
         color: s.color,
-        connected: online.has(s.id),
+        connected: s.bot !== null || online.has(s.id),
+        bot: s.bot,
+        standIn: s.bot === null && this.isStandIn(s, now),
       })),
       packId: this.data.packId,
       rules: this.data.rules,
       dice: this.data.dice,
       paused: this.data.paused,
       deadline: this.data.deadline,
-      serverTime: this.host.now(),
+      botTakeoverSeconds: this.data.botTakeoverSeconds,
+      serverTime: now,
     };
   }
 
@@ -154,7 +187,16 @@ export class Room {
     this.handle(conn, message.data);
   }
 
+  /** Eine Verbindung ist weg: Abwesenheit merken, damit später ein Bot übernehmen kann. */
   disconnected(): void {
+    const online = new Set(this.host.connections().map((c) => c.seatId));
+    const now = this.host.now();
+    for (const seat of this.data.seats) {
+      if (seat.bot === null && !online.has(seat.id) && seat.disconnectedAt === null)
+        seat.disconnectedAt = now;
+    }
+    this.scheduleBots();
+    this.persistRoom();
     this.broadcastRoom();
   }
 
@@ -166,8 +208,12 @@ export class Room {
         return this.join(conn, message.name, message.color);
       case 'updateSeat':
         return this.updateSeat(conn, message.name, message.color);
+      case 'addBot':
+        return this.addBot(conn, message.level);
       case 'configure':
         return this.configure(conn, message.packId, message.rules, message.dice);
+      case 'roomSettings':
+        return this.roomSettings(conn, message.botTakeoverSeconds);
       case 'start':
         return this.start(conn);
       case 'action':
@@ -184,20 +230,37 @@ export class Room {
     }
   }
 
-  /** Uhr abgelaufen: Auktion schließen oder Standardaktion für den Spieler am Zug. */
+  /**
+   * Alarm: zuerst ein fälliger Bot-Zug, sonst eine abgelaufene Uhr (Auktion schließen bzw.
+   * Standardaktion für den Spieler am Zug). Danach wird der nächste Alarm gestellt.
+   */
   alarm(): void {
-    const deadline = this.data.deadline;
-    if (!deadline || !this.game || this.data.paused || this.data.status !== 'playing') return;
-    if (this.host.now() < deadline.at - 25) {
-      this.host.setAlarm(deadline.at);
+    if (!this.game || this.data.status !== 'playing' || this.data.paused) {
+      this.armAlarm();
       return;
     }
-    const action =
-      deadline.kind === 'auction'
-        ? ({ type: 'AUCTION_CLOSE' } as const)
-        : getDefaultAction(this.game.state);
-    if (!action || !this.run(action, null)) {
-      this.setDeadline(null);
+    const now = this.host.now();
+    let acted = false;
+
+    if (this.data.botAt !== null && now >= this.data.botAt - 25) {
+      this.data.botAt = null;
+      const step = this.nextBotAction(false);
+      if (step) acted = this.run(step, null);
+    }
+
+    const deadline = this.data.deadline;
+    if (!acted && deadline && now >= deadline.at - 25) {
+      const action =
+        deadline.kind === 'auction'
+          ? ({ type: 'AUCTION_CLOSE' } as const)
+          : getDefaultAction(this.game.state);
+      acted = action !== null && this.run(action, null);
+      if (!acted) this.data.deadline = null;
+    }
+
+    if (!acted) {
+      // Nichts passiert (z. B. Vertretung beginnt jetzt): neu planen und alle informieren.
+      this.scheduleBots();
       this.persistRoom();
       this.broadcastRoom();
     }
@@ -206,8 +269,11 @@ export class Room {
   // ---- Lobby ---------------------------------------------------------------------------
 
   private hello(conn: Connection, token: string | undefined): void {
-    const seat = token ? this.data.seats.find((s) => s.token === token) : undefined;
+    const seat = token
+      ? this.data.seats.find((s) => s.bot === null && s.token === token)
+      : undefined;
     this.host.assignSeat(conn.id, seat?.id ?? null);
+    if (seat) seat.disconnectedAt = null;
     this.host.send(conn.id, {
       t: 'welcome',
       seatId: seat?.id ?? null,
@@ -222,18 +288,20 @@ export class Room {
         reset: true,
       });
     }
+    if (seat) {
+      this.scheduleBots();
+      this.persistRoom();
+    }
     this.broadcastRoom();
   }
 
   private join(conn: Connection, name: string, color: string): void {
     if (conn.seatId) return this.error(conn.id, 'alreadySeated');
     if (this.data.status !== 'lobby') return this.error(conn.id, 'notInLobby');
-    const pack = findPack(this.data.packId) ?? standardPack;
-    if (this.data.seats.length >= pack.maxPlayers) return this.error(conn.id, 'roomFull');
+    if (this.isFull()) return this.error(conn.id, 'roomFull');
     if (this.data.seats.some((s) => s.color === color)) return this.error(conn.id, 'colorTaken');
 
-    const seat: Seat = { id: `p${this.data.nextSeat++}`, name, color, token: this.host.newToken() };
-    this.data.seats.push(seat);
+    const seat = this.addSeat(name, color, null);
     this.data.hostSeatId ??= seat.id;
     this.host.assignSeat(conn.id, seat.id);
     this.persistRoom();
@@ -244,6 +312,32 @@ export class Room {
       room: this.view(),
     });
     this.broadcastRoom();
+  }
+
+  private addBot(conn: Connection, level: BotLevel): void {
+    if (!this.isHost(conn)) return this.error(conn.id, 'notHost');
+    if (this.data.status !== 'lobby') return this.error(conn.id, 'notInLobby');
+    if (this.isFull()) return this.error(conn.id, 'roomFull');
+    const names = new Set(this.data.seats.map((s) => s.name));
+    const colors = new Set(this.data.seats.map((s) => s.color));
+    const name = BOT_NAMES.find((n) => !names.has(n)) ?? `Bot ${this.data.nextSeat}`;
+    const color = PLAYER_COLORS.find((c) => !colors.has(c)) ?? PLAYER_COLORS[0]!;
+    this.addSeat(name, color, level);
+    this.persistRoom();
+    this.broadcastRoom();
+  }
+
+  private addSeat(name: string, color: string, bot: BotLevel | null): Seat {
+    const seat: Seat = {
+      id: `p${this.data.nextSeat++}`,
+      name,
+      color,
+      token: this.host.newToken(),
+      bot,
+      disconnectedAt: null,
+    };
+    this.data.seats.push(seat);
+    return seat;
   }
 
   private updateSeat(conn: Connection, name: string, color: string): void {
@@ -274,6 +368,14 @@ export class Room {
     this.broadcastRoom();
   }
 
+  private roomSettings(conn: Connection, botTakeoverSeconds: number | null): void {
+    if (!this.isHost(conn)) return this.error(conn.id, 'notHost');
+    this.data.botTakeoverSeconds = botTakeoverSeconds;
+    this.scheduleBots();
+    this.persistRoom();
+    this.broadcastRoom();
+  }
+
   private start(conn: Connection): void {
     if (!this.isHost(conn)) return this.error(conn.id, 'notHost');
     if (this.data.status !== 'lobby') return this.error(conn.id, 'notInLobby');
@@ -288,7 +390,8 @@ export class Room {
     });
     this.game = { initial, state: initial, events: [] };
     this.data.status = 'playing';
-    this.setDeadline(this.nextDeadline(initial, initial, null, []));
+    this.data.deadline = this.nextDeadline(initial, initial, null, []);
+    this.scheduleBots();
     this.host.saveGame(this.game, []);
     this.persistRoom();
     this.broadcast({ t: 'game', state: initial, events: [], reset: true });
@@ -328,7 +431,10 @@ export class Room {
     if (this.data.status !== 'playing' || !this.game) return this.error(conn.id, 'notPlaying');
     this.data.paused = paused;
     // Nach der Pause beginnt die Uhr neu.
-    this.setDeadline(paused ? null : this.nextDeadline(this.game.state, this.game.state, null, []));
+    this.data.deadline = paused
+      ? null
+      : this.nextDeadline(this.game.state, this.game.state, null, []);
+    this.scheduleBots();
     this.persistRoom();
     this.broadcastRoom();
   }
@@ -372,7 +478,8 @@ export class Room {
       this.data.rules = result.state.rules;
       this.data.dice = result.state.dice;
     }
-    this.setDeadline(this.nextDeadline(before, result.state, action, result.events));
+    this.data.deadline = this.nextDeadline(before, result.state, action, result.events);
+    this.scheduleBots();
     this.host.saveGame(game, [action]);
     this.persistRoom();
     this.broadcast({ t: 'game', state: result.state, events: result.events, reset: false });
@@ -419,12 +526,88 @@ export class Room {
     return reset ? { kind: 'turn', at: now + timers.turnSeconds * 1000 } : previous;
   }
 
-  private setDeadline(deadline: Deadline | null): void {
-    this.data.deadline = deadline;
-    this.host.setAlarm(deadline?.at ?? null);
+  // ---- Bots -----------------------------------------------------------------------------
+
+  /** Vertritt gerade ein Bot diesen (abwesenden) Menschen? */
+  private isStandIn(seat: Seat, now: number): boolean {
+    const limit = this.data.botTakeoverSeconds;
+    return (
+      seat.bot === null &&
+      this.data.status === 'playing' &&
+      seat.disconnectedAt !== null &&
+      limit !== null &&
+      now - seat.disconnectedAt >= limit * 1000
+    );
+  }
+
+  private botLevel(seat: Seat, now: number): BotLevel | null {
+    return seat.bot ?? (this.isStandIn(seat, now) ? STAND_IN_LEVEL : null);
+  }
+
+  /**
+   * Nächste Aktion eines Bots: erst der Spieler am Zug, dann alle anderen (Auktion,
+   * Angebote). `probe` prüft nur, ohne das Gedächtnis der Bots zu verändern.
+   */
+  private nextBotAction(probe: boolean): Action | null {
+    const state = this.game?.state;
+    if (!state || state.phase.name === 'gameOver') return null;
+    const now = this.host.now();
+    const acting = actingPlayerId(state);
+    const seats = [...this.data.seats].sort(
+      (a, b) => Number(b.id === acting) - Number(a.id === acting),
+    );
+    for (const seat of seats) {
+      const level = this.botLevel(seat, now);
+      if (!level) continue;
+      let memory = this.memories.get(seat.id);
+      if (!memory) {
+        memory = newBotMemory();
+        this.memories.set(seat.id, memory);
+      }
+      const action = decideBot(state, seat.id, level, probe ? structuredClone(memory) : memory);
+      if (action) return action;
+    }
+    return null;
+  }
+
+  /** Plant den nächsten Bot-Zug und stellt den Alarm. */
+  private scheduleBots(): void {
+    const now = this.host.now();
+    const active = this.data.status === 'playing' && !this.data.paused && this.game !== null;
+    if (active && this.nextBotAction(true)) {
+      this.data.botAt =
+        this.data.botAt !== null && this.data.botAt > now ? this.data.botAt : now + BOT_DELAY_MS;
+    } else {
+      this.data.botAt = null;
+    }
+    this.armAlarm();
+  }
+
+  /** Ein Alarm für alles: Bot-Zug, Uhr und der Moment, ab dem ein Bot vertritt. */
+  private armAlarm(): void {
+    const times: number[] = [];
+    if (this.data.status === 'playing' && !this.data.paused) {
+      if (this.data.deadline) times.push(this.data.deadline.at);
+      if (this.data.botAt !== null) times.push(this.data.botAt);
+      const limit = this.data.botTakeoverSeconds;
+      const now = this.host.now();
+      if (limit !== null) {
+        for (const seat of this.data.seats) {
+          if (seat.bot !== null || seat.disconnectedAt === null) continue;
+          const at = seat.disconnectedAt + limit * 1000;
+          if (at > now) times.push(at);
+        }
+      }
+    }
+    this.host.setAlarm(times.length > 0 ? Math.min(...times) : null);
   }
 
   // ---- Hilfen ---------------------------------------------------------------------------
+
+  private isFull(): boolean {
+    const pack = findPack(this.data.packId) ?? standardPack;
+    return this.data.seats.length >= pack.maxPlayers;
+  }
 
   private isHost(conn: Connection): boolean {
     return conn.seatId !== null && conn.seatId === this.data.hostSeatId;

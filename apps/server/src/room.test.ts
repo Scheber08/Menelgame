@@ -120,8 +120,8 @@ describe('Lobby', () => {
     const view = room.view();
     expect(view.hostSeatId).toBe('p1');
     expect(view.seats).toEqual([
-      { id: 'p1', name: 'Anna', color: '#e5484d', connected: true },
-      { id: 'p2', name: 'Ben', color: '#3e63dd', connected: true },
+      { id: 'p1', name: 'Anna', color: '#e5484d', connected: true, bot: null, standIn: false },
+      { id: 'p2', name: 'Ben', color: '#3e63dd', connected: true, bot: null, standIn: false },
     ]);
     expect(host.last('b', 'welcome')).toMatchObject({ seatId: 'p2', token: 'token-2' });
     // Tokens erscheinen nie in der öffentlichen Ansicht.
@@ -346,5 +346,153 @@ describe('Spiel über den Raum', () => {
     const reborn = new Room(host, saved.room!, saved.game!);
     expect(reborn.game!.state).toEqual(state());
     expect(replay({ initial: saved.game!.initial, actions: saved.actions }).state).toEqual(state());
+  });
+});
+
+/** Lässt die Uhr bis zum jeweils nächsten Alarm laufen. */
+function runAlarms(maxSteps: number): number {
+  let steps = 0;
+  while (host.alarmAt !== null && steps < maxSteps) {
+    host.clock = Math.max(host.clock, host.alarmAt);
+    room.alarm();
+    steps++;
+  }
+  return steps;
+}
+
+describe('Bots im Raum', () => {
+  it('fügt Bots nur als Host in der Lobby hinzu', () => {
+    lobbyWithTwo();
+    send('b', { t: 'addBot', level: 'easy' });
+    expect(host.last('b', 'error')).toEqual({ t: 'error', code: 'notHost' });
+    send('a', { t: 'addBot', level: 'medium' });
+    send('a', { t: 'addBot', level: 'easy' });
+    expect(room.view().seats.slice(2)).toEqual([
+      {
+        id: 'p3',
+        name: 'Bot Anton',
+        color: '#30a46c',
+        connected: true,
+        bot: 'medium',
+        standIn: false,
+      },
+      {
+        id: 'p4',
+        name: 'Bot Berta',
+        color: '#f5a524',
+        connected: true,
+        bot: 'easy',
+        standIn: false,
+      },
+    ]);
+    // Bots lassen sich wie Menschen wieder entfernen.
+    send('a', { t: 'kick', seatId: 'p4' });
+    expect(room.view().seats).toHaveLength(3);
+  });
+
+  it('lässt Bots mit kurzer Verzögerung ziehen', () => {
+    connect('a');
+    seat('a', 'Anna', '#e5484d');
+    send('a', { t: 'addBot', level: 'medium' });
+    send('a', { t: 'start' });
+    expect(room.data.botAt).toBeNull();
+    send('a', { t: 'action', action: { type: 'ROLL_DICE' } });
+    // Anna zieht zu Ende; danach ist der Bot dran.
+    while (room.game!.state.currentPlayer === 0 && room.game!.state.phase.name !== 'gameOver') {
+      const phase = room.game!.state.phase;
+      if (phase.name === 'auction') {
+        runAlarms(1);
+        continue;
+      }
+      const action =
+        phase.name === 'awaitingPurchase'
+          ? ({ type: 'DECLINE' } as const)
+          : phase.name === 'freePhase' && phase.extraRoll
+            ? ({ type: 'ROLL_DICE' } as const)
+            : ({ type: 'END_TURN' } as const);
+      send('a', { t: 'action', action });
+    }
+    const count = room.game!.state.actionCount;
+    expect(room.data.botAt).toBe(host.clock + 900);
+    // Vor Ablauf passiert nichts.
+    host.clock += 500;
+    room.alarm();
+    expect(room.game!.state.actionCount).toBe(count);
+    host.clock += 400;
+    room.alarm();
+    expect(room.game!.state.actionCount).toBe(count + 1);
+    expect(room.game!.events.some((e) => e.type === 'diceRolled' && e.playerId === 'p2')).toBe(
+      true,
+    );
+  });
+
+  it('vertritt abwesende Spieler nach der eingestellten Zeit', () => {
+    const { tokenB } = lobbyWithTwo();
+    send('a', { t: 'roomSettings', botTakeoverSeconds: 30 });
+    send('a', { t: 'start' });
+    // Anna (p1) ist dran und geht offline.
+    host.close('a');
+    room.disconnected();
+    expect(room.data.seats[0]!.disconnectedAt).toBe(host.clock);
+    expect(host.alarmAt).toBe(host.clock + 30_000);
+    expect(room.view().seats[0]!.standIn).toBe(false);
+
+    host.clock += 30_000;
+    room.alarm();
+    expect(room.view().seats[0]!.standIn).toBe(true);
+    // Der Vertreter zieht nach der kurzen Verzögerung.
+    runAlarms(1);
+    expect(room.game!.events.some((e) => e.type === 'diceRolled' && e.playerId === 'p1')).toBe(
+      true,
+    );
+
+    // Ben bleibt Mensch und wird nicht vertreten.
+    expect(room.view().seats[1]).toMatchObject({ standIn: false, connected: true });
+    expect(tokenB).toBeTruthy();
+  });
+
+  it('beendet die Vertretung, sobald der Spieler zurück ist', () => {
+    const { tokenA } = lobbyWithTwo();
+    send('a', { t: 'roomSettings', botTakeoverSeconds: 10 });
+    send('a', { t: 'start' });
+    host.close('a');
+    room.disconnected();
+    host.clock += 10_000;
+    room.alarm();
+    expect(room.view().seats[0]!.standIn).toBe(true);
+    connect('a2', tokenA);
+    expect(room.view().seats[0]!.standIn).toBe(false);
+    expect(room.data.seats[0]!.disconnectedAt).toBeNull();
+  });
+
+  it('übernimmt nie, wenn der Host das abschaltet', () => {
+    lobbyWithTwo();
+    send('a', { t: 'roomSettings', botTakeoverSeconds: null });
+    send('a', { t: 'start' });
+    host.close('a');
+    room.disconnected();
+    expect(host.alarmAt).toBeNull();
+  });
+
+  it('spielt ein Spiel nur mit Bots über den Alarm bis zum Ende', () => {
+    connect('a');
+    seat('a', 'Anna', '#e5484d');
+    send('a', { t: 'addBot', level: 'medium' });
+    send('a', { t: 'addBot', level: 'easy' });
+    send('a', { t: 'addBot', level: 'medium' });
+    send('a', { t: 'roomSettings', botTakeoverSeconds: 10 });
+    send('a', { t: 'start' });
+    // Der Host geht; ab jetzt spielen nur noch Bots (einer davon als Vertretung).
+    host.close('a');
+    room.disconnected();
+    const steps = runAlarms(50_000);
+    expect(room.game!.state.phase.name).toBe('gameOver');
+    expect(room.data.status).toBe('finished');
+    expect(steps).toBeLessThan(50_000);
+    expect(host.alarmAt).toBeNull();
+    // Auch dieses Spiel lässt sich exakt nachspielen.
+    expect(
+      replay({ initial: host.saved.game!.initial, actions: host.saved.actions }).state,
+    ).toEqual(room.game!.state);
   });
 });

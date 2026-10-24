@@ -7,6 +7,32 @@ import { z } from 'zod';
  * und Aktionen; der Raum hält den autoritativen Zustand und verteilt ihn.
  */
 
+/** Farben für Spielfiguren (auch für Bots). */
+export const PLAYER_COLORS = [
+  '#e5484d',
+  '#3e63dd',
+  '#30a46c',
+  '#f5a524',
+  '#8e4ec6',
+  '#12a594',
+  '#d6409f',
+  '#6e6e6e',
+] as const;
+
+export const BotLevelSchema = z.enum(['easy', 'medium']);
+export type BotLevel = z.infer<typeof BotLevelSchema>;
+
+export const BOT_NAMES = [
+  'Bot Anton',
+  'Bot Berta',
+  'Bot Carlo',
+  'Bot Dora',
+  'Bot Emil',
+  'Bot Fiona',
+  'Bot Gustav',
+  'Bot Hanna',
+];
+
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const ROOM_CODE_LENGTH = 6;
 export const ROOM_CODE_PATTERN = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
@@ -75,6 +101,13 @@ export const ClientMessageSchema = z.discriminatedUnion('t', [
   /** In der Lobby einen Platz nehmen. */
   z.object({ t: z.literal('join'), name: SeatNameSchema, color: ColorSchema }),
   z.object({ t: z.literal('updateSeat'), name: SeatNameSchema, color: ColorSchema }),
+  /** Host in der Lobby: Bot-Platz hinzufügen. */
+  z.object({ t: z.literal('addBot'), level: BotLevelSchema }),
+  /** Host: nach wie vielen Sekunden Abwesenheit ein Bot übernimmt (null = nie). */
+  z.object({
+    t: z.literal('roomSettings'),
+    botTakeoverSeconds: z.int().min(10).max(3600).nullable(),
+  }),
   /** Host in der Lobby: Brett und Regeln wählen. */
   z.object({
     t: z.literal('configure'),
@@ -99,6 +132,10 @@ export interface SeatView {
   name: string;
   color: string;
   connected: boolean;
+  /** Bot-Platz und Stufe; null für Menschen. */
+  bot: BotLevel | null;
+  /** Ein Bot vertritt den abwesenden Menschen. */
+  standIn: boolean;
 }
 
 export interface Deadline {
@@ -117,6 +154,7 @@ export interface RoomView {
   dice: DiceConfig;
   paused: boolean;
   deadline: Deadline | null;
+  botTakeoverSeconds: number | null;
   /** Serverzeit beim Senden, damit Clients ihre Uhr abgleichen können. */
   serverTime: number;
 }
