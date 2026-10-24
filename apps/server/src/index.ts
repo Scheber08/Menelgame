@@ -1,4 +1,5 @@
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, type CreateRoomResponse } from '@menelgame/protocol';
+import { handleApi, type SqlDatabase } from './api';
 import type { Env } from './gameRoom';
 
 export { GameRoom } from './gameRoom';
@@ -39,8 +40,12 @@ export default {
     const log = url.pathname.match(/^\/api\/rooms\/([A-Z0-9]+)\/log$/);
     if (log) {
       const result = await roomStub(log[1]!).log();
+      if (result === 'notFinished') return json({ error: 'notFinished' }, 403);
       return result ? json(result) : json({ error: 'notFound' }, 404);
     }
+
+    const api = await handleApi(request, { db: env.DB as unknown as SqlDatabase, now: Date.now });
+    if (api) return api;
 
     const socket = url.pathname.match(/^\/r\/([A-Z0-9]+)\/ws$/);
     if (socket) return roomStub(socket[1]!).fetch(request);
