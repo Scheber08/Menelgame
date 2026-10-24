@@ -36,8 +36,18 @@ apps/
   server/             Platzhalter für Phase 2
 packages/
   schema/src/         Zod-Schemas: pack.ts, rules.ts, tiles.ts, effects.ts
-  engine/src/         apply, Zustand, Effekte, Feldtypen, Tests (*.test.ts)
-  packs/src/          standard.json + Export
+  engine/src/
+    apply.ts          apply, getLegalActions
+    actions.ts        Validierung + Ausführung pro Aktionstyp
+    effects.ts        Effekt-Interpreter, Bewegung, Karten, Miete fällig
+    tileTypes.ts      Feldtyp-Registry (onLand/onPass → Effekte)
+    turn.ts           Phasenwechsel, Zugende, Siegbedingungen
+    bankruptcy.ts     Bankrott
+    auction.ts        Auktions-Hook (TODO Phase 2)
+    create.ts         Startzustand
+    replay.ts         Replay aus Log
+    test/helpers.ts   Testhilfen (rigDice, landOn, …)
+  packs/src/          standard.json („Neustadt“, 40 Felder) + Export
 docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 ```
 
@@ -46,11 +56,16 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 - Kernfunktion `apply(state, action) → { ok, state, events, error? }`. Keine Seiteneffekte, keine Mutation des Eingabezustands (intern wird eine Kopie bearbeitet).
 - Jede Aktion wird zuerst von `validateAction` geprüft (am Zug? Phase erlaubt? Geld reicht?). Ungültige Aktionen liefern einen typisierten `EngineError`; der Zustand bleibt unverändert.
 - Zufall nur über den gesetzten PRNG (mulberry32) in `state.rng`. Kein `Math.random`, kein `Date` in der Engine (ESLint verbietet `Math.random`).
-- Ereignis-Log: `replay(initialState, actions)` muss exakt denselben Endzustand ergeben.
+- Ereignis-Log: `replay({ initial, actions })` muss exakt denselben Endzustand ergeben.
 - Zugphasen als expliziter Zustandsautomat in `state.phase`: `awaitingRoll`, `awaitingPurchase`, `freePhase`, `awaitingDebt`, `gameOver`. Feldauflösung passiert synchron innerhalb von `apply`.
 - Feldverhalten läuft über die Feldtyp-Registry (`tileTypes.ts`), die deklarative Effekte liefert. Kein `switch` auf Feldnamen. Karten nutzen dieselben Effekte.
 - Geldbeträge sind ganze Zahlen.
 - Erweiterungspunkte: `startAuction`-Hook (Auktionen), `state.agreements` (Handel mit Laufzeit), `state.rules`/`state.dice` (live änderbar), `getLegalActions` (Bots).
+
+## Stand
+
+- **Phase 1 abgeschlossen:** Schema, Engine, Standard-Pack, Hot-Seat-Oberfläche, Tests inkl. kompletter Spiele mit Replay.
+- Offen für Phase 2: Auktionen (Hook `startAuction`), Handel, Server. Siehe docs/KONZEPT.md.
 
 ## Arbeitsweise
 

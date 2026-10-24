@@ -14,16 +14,16 @@ Menelgame ist ein vollständig anpassbares Grundstücks-Handelsspiel (Monopoly-a
 
 Alles, was ein Spiel ausmacht, steckt in einem **Board Pack** (JSON):
 
-| Teil | Inhalt |
-| --- | --- |
-| `meta` | ID, Name, Version, Autor, Beschreibung |
-| `rules` | Startgeld, Los-Bonus, Auktionen, Frei-Parken-Topf, Gefängnisregeln, Baulimit, gleichmäßiges Bauen, Hypothekenzins, Siegbedingung, Bankrott-Regel |
-| `dice` | Anzahl und Seitenzahl der Würfel |
-| `maxPlayers` | Höchstzahl an Spielern |
-| `layout` | Form des Bretts (Phase 1: Quadrat, Rechteck) |
-| `groups` | Farbgruppen, Bahnhofs- und Werksgruppen |
-| `tiles` | Felder; jedes Feld hat einen Feldtyp |
-| `decks` | Kartenstapel mit Karten, deren Wirkung als feste Aktionen beschrieben ist |
+| Teil         | Inhalt                                                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `meta`       | ID, Name, Version, Autor, Beschreibung                                                                                                           |
+| `rules`      | Startgeld, Los-Bonus, Auktionen, Frei-Parken-Topf, Gefängnisregeln, Baulimit, gleichmäßiges Bauen, Hypothekenzins, Siegbedingung, Bankrott-Regel |
+| `dice`       | Anzahl und Seitenzahl der Würfel                                                                                                                 |
+| `maxPlayers` | Höchstzahl an Spielern                                                                                                                           |
+| `layout`     | Form des Bretts (Phase 1: Quadrat, Rechteck)                                                                                                     |
+| `groups`     | Farbgruppen, Bahnhofs- und Werksgruppen                                                                                                          |
+| `tiles`      | Felder; jedes Feld hat einen Feldtyp                                                                                                             |
+| `decks`      | Kartenstapel mit Karten, deren Wirkung als feste Aktionen beschrieben ist                                                                        |
 
 Die Engine kennt **keine fest eingebauten Felder**, nur Feldtypen und Effekte. Klassische Felder (Grundstück, Bahnhof, Werk, Steuer, Karte, Gefängnis, Los, Frei Parken, Ab ins Gefängnis) sind eingebaute Feldtypen, die dasselbe Effektsystem nutzen wie spätere eigene Typen.
 
