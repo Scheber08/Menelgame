@@ -1,4 +1,6 @@
+import { decideBot, newBotMemory, type BotLevel, type BotMemory } from '@menelgame/bots';
 import {
+  actingPlayerId,
   apply,
   createGame,
   replay,
@@ -10,35 +12,67 @@ import {
   type GameSetup,
   type GameState,
 } from '@menelgame/engine';
+import type { BoardPack } from '@menelgame/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const STORAGE_KEY = 'menelgame.hotseat.v2';
+const STORAGE_KEY = 'menelgame.hotseat.v3';
+const TEST_KEY = 'menelgame.testGame';
+/** Pause vor jedem Bot-Zug, damit man mitlesen kann. */
+const BOT_DELAY_MS = 700;
+
+export type BotSeats = Record<string, BotLevel>;
 
 export interface HotSeatGame {
   log: GameLog;
   state: GameState;
   events: GameEvent[];
+  bots: BotSeats;
+}
+
+interface Stored extends GameLog {
+  bots?: BotSeats;
 }
 
 function load(): HotSeatGame | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const log = JSON.parse(raw) as GameLog;
-    if (log.initial?.stateVersion !== STATE_VERSION) return null;
+    const stored = JSON.parse(raw) as Stored;
+    if (stored.initial?.stateVersion !== STATE_VERSION) return null;
+    const log = { initial: stored.initial, actions: stored.actions };
     const { state, events } = replay(log);
-    return { log, state, events };
+    return { log, state, events, bots: stored.bots ?? {} };
   } catch {
     return null;
   }
 }
 
-function save(log: GameLog | null): void {
+function save(game: HotSeatGame | null): void {
   try {
-    if (log) localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+    if (game) localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...game.log, bots: game.bots }));
     else localStorage.removeItem(STORAGE_KEY);
   } catch {
     // Speichern ist nur Komfort; ohne Speicher läuft das Spiel trotzdem.
+  }
+}
+
+/** Testmodus aus dem Editor: das Pack wird beim nächsten Öffnen von /lokal sofort gespielt. */
+export function saveTestGame(pack: BoardPack): void {
+  try {
+    sessionStorage.setItem(TEST_KEY, JSON.stringify(pack));
+  } catch {
+    // Ohne Speicher startet man den Test über das normale Setup.
+  }
+}
+
+export function takeTestGame(): BoardPack | null {
+  try {
+    const raw = sessionStorage.getItem(TEST_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(TEST_KEY);
+    return JSON.parse(raw) as BoardPack;
+  } catch {
+    return null;
   }
 }
 
@@ -47,8 +81,8 @@ function auctionSeconds(state: GameState): number {
 }
 
 /**
- * Lokales Hot-Seat-Spiel: alle Aktionen laufen über die Engine und landen im Log. Die Uhr
- * für Auktionen läuft hier im Browser (online übernimmt das der Server).
+ * Lokales Spiel an einem Gerät, optional mit Bots: alle Aktionen laufen über die Engine und
+ * landen im Log. Uhr für Auktionen und Bot-Züge laufen hier im Browser.
  */
 export function useHotSeatGame() {
   const [game, setGame] = useState<HotSeatGame | null>(load);
@@ -59,14 +93,16 @@ export function useHotSeatGame() {
       ? Date.now() + auctionSeconds(loaded.state)
       : null;
   });
+  const memories = useRef(new Map<string, BotMemory>());
 
-  useEffect(() => save(game?.log ?? null), [game]);
+  useEffect(() => save(game), [game]);
 
-  const start = useCallback((setup: GameSetup) => {
+  const start = useCallback((setup: GameSetup, bots: BotSeats = {}) => {
     const initial = createGame(setup);
+    memories.current.clear();
     setError(null);
     setAuctionDeadline(null);
-    setGame({ log: { initial, actions: [] }, state: initial, events: [] });
+    setGame({ log: { initial, actions: [] }, state: initial, events: [], bots });
   }, []);
 
   const dispatch = useCallback(
@@ -91,16 +127,18 @@ export function useHotSeatGame() {
         log: { initial: game.log.initial, actions: [...game.log.actions, action] },
         state: next,
         events: [...game.events, ...result.events],
+        bots: game.bots,
       });
     },
     [game],
   );
 
-  // Auktion schließen, wenn die Zeit abgelaufen ist.
   const dispatchRef = useRef(dispatch);
   useEffect(() => {
     dispatchRef.current = dispatch;
   }, [dispatch]);
+
+  // Auktion schließen, wenn die Zeit abgelaufen ist.
   useEffect(() => {
     if (auctionDeadline === null) return;
     const id = window.setTimeout(
@@ -109,6 +147,30 @@ export function useHotSeatGame() {
     );
     return () => window.clearTimeout(id);
   }, [auctionDeadline]);
+
+  // Bots ziehen mit kurzer Verzögerung: erst der Handelnde, dann alle anderen.
+  useEffect(() => {
+    if (!game || game.state.phase.name === 'gameOver') return;
+    const ids = Object.keys(game.bots);
+    if (ids.length === 0) return;
+    const state = game.state;
+    const acting = actingPlayerId(state);
+    const order = [...ids].sort((a, b) => Number(b === acting) - Number(a === acting));
+    let action: Action | null = null;
+    for (const id of order) {
+      let memory = memories.current.get(id);
+      if (!memory) {
+        memory = newBotMemory();
+        memories.current.set(id, memory);
+      }
+      action = decideBot(state, id, game.bots[id]!, memory);
+      if (action) break;
+    }
+    if (!action) return;
+    const chosen = action;
+    const id = window.setTimeout(() => dispatchRef.current(chosen), BOT_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, [game]);
 
   const reset = useCallback(() => {
     setError(null);

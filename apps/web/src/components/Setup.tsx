@@ -1,4 +1,6 @@
+import type { BotLevel } from '@menelgame/bots';
 import type { GameSetup } from '@menelgame/engine';
+import type { BotSeats } from '../game/useHotSeatGame';
 import { builtInPacks } from '@menelgame/packs';
 import type { BoardPack, DiceConfig, Rules } from '@menelgame/schema';
 import { useState, type FormEvent } from 'react';
@@ -18,15 +20,20 @@ function randomSeed(): number {
 interface SeatDraft {
   name: string;
   color: string;
+  bot: BotLevel | null;
 }
 
-export function Setup({ onStart }: { onStart: (setup: GameSetup) => void }) {
+export function Setup({ onStart }: { onStart: (setup: GameSetup, bots: BotSeats) => void }) {
   const { t } = useTranslation();
   const [pack, setPack] = useState<BoardPack>(builtInPacks[0]!);
   const maxSeats = Math.min(HOT_SEAT_MAX, pack.maxPlayers);
 
   const [seats, setSeats] = useState<SeatDraft[]>(() =>
-    [1, 2].map((n) => ({ name: t('setup.defaultName', { n }), color: PLAYER_COLORS[n - 1]! })),
+    [1, 2].map((n) => ({
+      name: t('setup.defaultName', { n }),
+      color: PLAYER_COLORS[n - 1]!,
+      bot: null,
+    })),
   );
   const [rules, setRules] = useState<Rules>(() => structuredClone(pack.rules));
   const [dice, setDice] = useState<DiceConfig>(() => structuredClone(pack.dice));
@@ -49,6 +56,7 @@ export function Setup({ onStart }: { onStart: (setup: GameSetup) => void }) {
       {
         name: t('setup.defaultName', { n: list.length + 1 }),
         color: firstFreeColor(list.map((s) => s.color)),
+        bot: null,
       },
     ]);
 
@@ -59,13 +67,20 @@ export function Setup({ onStart }: { onStart: (setup: GameSetup) => void }) {
       return;
     }
     const parsedSeed = Number.parseInt(seed, 10);
-    onStart({
-      pack,
-      rules,
-      dice,
-      seed: Number.isFinite(parsedSeed) ? parsedSeed >>> 0 : randomSeed(),
-      players: seats.map((s, i) => ({ id: `p${i + 1}`, name: s.name.trim(), color: s.color })),
-    });
+    const players = seats.map((s, i) => ({ id: `p${i + 1}`, name: s.name.trim(), color: s.color }));
+    const bots: BotSeats = Object.fromEntries(
+      seats.flatMap((s, i) => (s.bot ? [[`p${i + 1}`, s.bot] as const] : [])),
+    );
+    onStart(
+      {
+        pack,
+        rules,
+        dice,
+        seed: Number.isFinite(parsedSeed) ? parsedSeed >>> 0 : randomSeed(),
+        players,
+      },
+      bots,
+    );
   };
 
   return (
@@ -92,6 +107,15 @@ export function Setup({ onStart }: { onStart: (setup: GameSetup) => void }) {
               maxLength={20}
               onChange={(e) => updateSeat(i, { name: e.target.value })}
             />
+            <select
+              aria-label={t('setup.seatKind')}
+              value={seat.bot ?? ''}
+              onChange={(e) => updateSeat(i, { bot: (e.target.value || null) as BotLevel | null })}
+            >
+              <option value="">{t('setup.human')}</option>
+              <option value="easy">{t('setup.botEasy')}</option>
+              <option value="medium">{t('setup.botMedium')}</option>
+            </select>
             <ColorPicker
               value={seat.color}
               taken={seats.filter((_, j) => j !== i).map((s) => s.color)}
