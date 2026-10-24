@@ -13,19 +13,16 @@
   "durable_objects": {
     "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }],
   },
-  // Profile, eigene Packs und Regelsets. Für das Deployment einmal anlegen:
-  //   pnpm --filter @menelgame/server exec wrangler d1 create menelgame
-  // und die ausgegebene database_id hier eintragen. Lokal reicht der Platzhalter.
+  // Profile, eigene Packs und Regelsets. Ohne database_id legt `wrangler deploy` die
+  // Datenbank beim ersten Deployment selbst an und findet sie danach über den Namen.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "menelgame",
-      "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations",
     },
   ],
-  // Hochgeladene Bilder für Packs. Für das Deployment einmal anlegen:
-  //   pnpm --filter @menelgame/server exec wrangler r2 bucket create menelgame-images
+  // Hochgeladene Bilder für Packs; der Bucket wird beim ersten Deployment angelegt.
   "r2_buckets": [{ "binding": "IMAGES", "bucket_name": "menelgame-images" }],
   // Free Plan: nur SQLite-gestützte Durable Objects.
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }],

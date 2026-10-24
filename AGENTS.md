@@ -26,7 +26,7 @@ pnpm test             # alle Tests (Vitest)
 pnpm lint             # ESLint + Prettier-Check
 pnpm format           # Prettier schreibt
 pnpm build            # Typprüfung aller Pakete + Produktions-Build der Web-App
-pnpm deploy           # Web bauen und Worker samt Assets zu Cloudflare hochladen
+pnpm run deploy       # Web bauen und Worker samt Assets zu Cloudflare hochladen
 pnpm --filter @menelgame/server check   # Worker probehalber bündeln (ohne Upload)
 ```
 
@@ -34,13 +34,20 @@ Im Dev-Modus leitet Vite `/api/*` und `/r/<code>/ws` an `wrangler dev` weiter. O
 
 ## Deployment auf Cloudflare (Free Plan)
 
-1. Kostenloses Cloudflare-Konto anlegen.
+1. Kostenloses Cloudflare-Konto anlegen. R2 (Bilder) muss im Dashboard einmal aktiviert sein; 10 GB sind frei.
 2. Einmalig anmelden: `pnpm --filter @menelgame/server exec wrangler login`
-3. D1-Datenbank einmalig anlegen: `pnpm --filter @menelgame/server exec wrangler d1 create menelgame` und die ausgegebene `database_id` in `apps/server/wrangler.jsonc` eintragen.
-4. R2-Bucket für Bilder einmalig anlegen: `pnpm --filter @menelgame/server exec wrangler r2 bucket create menelgame-images` (R2 muss im Dashboard einmal aktiviert sein; 10 GB sind frei).
-5. Hochladen: `pnpm deploy`. Das wendet die D1-Migrationen (`apps/server/migrations`) remote an, legt den Worker `menelgame` an, lädt `apps/web/dist` als statische Assets hoch und führt die Durable-Object-Migration `v1` (SQLite) aus.
-6. Die App ist dann unter `https://menelgame.<dein-subdomain>.workers.dev` erreichbar. Einladungslinks haben die Form `/r/<CODE>`.
-7. Logs live ansehen: `pnpm --filter @menelgame/server exec wrangler tail`.
+3. Hochladen: `pnpm run deploy` (nicht `pnpm deploy` – das ist ein eingebauter pnpm-Befehl). Das baut die Web-App, legt beim ersten Mal D1-Datenbank `menelgame` und R2-Bucket `menelgame-images` automatisch an, lädt den Worker `menelgame` samt `apps/web/dist` hoch, führt die Durable-Object-Migration `v1` (SQLite) aus und wendet danach die D1-Migrationen (`apps/server/migrations`) remote an.
+4. Die App ist dann unter `https://menelgame.<dein-subdomain>.workers.dev` erreichbar. Einladungslinks haben die Form `/r/<CODE>`.
+5. Logs live ansehen: `pnpm --filter @menelgame/server exec wrangler tail`.
+
+**Automatisch aus GitHub (Workers Builds).** Das Repo ist ein Monorepo; der Standard-Befehl `npx wrangler deploy` im Wurzelordner scheitert deshalb. In den Einstellungen des Workers unter _Build_:
+
+- Root directory: leer lassen (`/`)
+- Build command: `pnpm --filter @menelgame/web build`
+- Deploy command: `pnpm --filter @menelgame/server run deploy`
+- Nicht-Produktions-Branches (optional): `pnpm --filter @menelgame/server exec wrangler versions upload`
+
+Der Worker im Dashboard muss `menelgame` heißen (wie `name` in `wrangler.jsonc`).
 
 Konfiguration: [apps/server/wrangler.jsonc](apps/server/wrangler.jsonc). Der Free Plan erlaubt nur SQLite-gestützte Durable Objects (`new_sqlite_classes`); Tageslimits (Requests, geschriebene Zeilen) stehen in der Cloudflare-Doku. Pro Spielaktion schreibt ein Raum etwa vier Zeilen.
 

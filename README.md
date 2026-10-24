@@ -23,7 +23,7 @@ Online spielen: „Raum erstellen“, Link an Freunde schicken, als Host starten
 pnpm test    # alle Tests
 pnpm lint    # ESLint + Prettier-Check
 pnpm build   # Typprüfung + Produktions-Build (apps/web/dist)
-pnpm deploy  # zu Cloudflare hochladen (vorher einmal wrangler login, siehe AGENTS.md)
+pnpm run deploy  # zu Cloudflare hochladen (vorher einmal wrangler login, siehe AGENTS.md)
 ```
 
 ## Mehr

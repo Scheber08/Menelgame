@@ -8,7 +8,7 @@
     "dev": "node scripts/ensure-assets.mjs && wrangler d1 migrations apply menelgame --local && wrangler dev --port 8787",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
     "check": "node scripts/ensure-assets.mjs && wrangler deploy --dry-run --outdir dist",
-    "deploy": "wrangler d1 migrations apply menelgame --remote && wrangler deploy"
+    "deploy": "wrangler deploy && wrangler d1 migrations apply menelgame --remote"
   },
   "dependencies": {
     "@menelgame/bots": "workspace:*",
