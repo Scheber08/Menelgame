@@ -7,12 +7,14 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --filter @menelgame/web dev",
+    "dev": "pnpm --parallel --filter @menelgame/web --filter @menelgame/server dev",
+    "dev:web": "pnpm --filter @menelgame/web dev",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "build": "pnpm -r --if-present build"
+    "build": "pnpm -r --if-present build",
+    "deploy": "pnpm --filter @menelgame/web build && pnpm --filter @menelgame/server run deploy"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

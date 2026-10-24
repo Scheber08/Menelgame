@@ -1,15 +1,26 @@
-import { actingPlayerId, type Action, type EngineError, type GameState } from '@menelgame/engine';
+import { actingPlayerId, type Action, type GameState, type PlayerAction } from '@menelgame/engine';
 import { useTranslation } from 'react-i18next';
 import { formatMoney, partyName, tileName } from '../game/format';
+import { Countdown } from './Countdown';
+
+export interface UiError {
+  code: string;
+  message?: string;
+}
 
 interface ActionBarProps {
   state: GameState;
-  legal: Action[];
-  error: EngineError | null;
+  /** Legale Aktionen des Handelnden – leer, wenn dieser Bildschirm ihn nicht steuert. */
+  legal: PlayerAction[];
+  /** Steuert dieser Bildschirm den handelnden Spieler? */
+  canAct: boolean;
+  error: UiError | null;
   dispatch: (action: Action) => void;
+  /** Ablauf des Zugtimers (lokale Uhr). */
+  turnDeadline?: number | null;
 }
 
-/** Aktionen des handelnden Spielers, die nicht an ein Feld gebunden sind. */
+/** Aktionen des handelnden Spieler, die nicht an ein Feld gebunden sind. */
 const GLOBAL_ACTIONS: Action['type'][] = [
   'ROLL_DICE',
   'BUY',
@@ -21,7 +32,7 @@ const GLOBAL_ACTIONS: Action['type'][] = [
   'DECLARE_BANKRUPTCY',
 ];
 
-export function ActionBar({ state, legal, error, dispatch }: ActionBarProps) {
+export function ActionBar({ state, legal, canAct, error, dispatch, turnDeadline }: ActionBarProps) {
   const { t } = useTranslation();
   if (state.phase.name === 'gameOver') {
     return (
@@ -60,6 +71,7 @@ export function ActionBar({ state, legal, error, dispatch }: ActionBarProps) {
         : '';
       break;
   }
+  if (!canAct && phase.name !== 'auction') hint = t('turn.waitingFor', { name: actor.name });
 
   const label = (action: Action): string => {
     switch (action.type) {
@@ -96,7 +108,7 @@ export function ActionBar({ state, legal, error, dispatch }: ActionBarProps) {
   );
 
   return (
-    <section className="panel turn-panel" aria-live="polite">
+    <section className={`panel turn-panel${canAct ? ' my-turn' : ''}`} aria-live="polite">
       <div className="turn-header">
         <span className="dot large" style={{ background: actor.color }} />
         <div>
@@ -106,33 +118,40 @@ export function ActionBar({ state, legal, error, dispatch }: ActionBarProps) {
             {actor.inJail && <span className="badge">{t('turn.inJail')}</span>}
           </div>
         </div>
-        <div className="turn-cash">{money(actor.cash)}</div>
+        <div className="turn-cash">
+          {turnDeadline && phase.name !== 'auction' && <Countdown at={turnDeadline} />}
+          {money(actor.cash)}
+        </div>
       </div>
       <p className="turn-hint">{hint}</p>
-      <div className="action-buttons">
-        {visible.map((action) => (
-          <button
-            key={action.type}
-            type="button"
-            className={
-              action.type === primary
-                ? 'primary'
-                : action.type === 'DECLARE_BANKRUPTCY'
-                  ? 'danger'
-                  : ''
-            }
-            onClick={() => run(action)}
-          >
-            {label(action)}
-          </button>
-        ))}
-      </div>
+      {visible.length > 0 && (
+        <div className="action-buttons">
+          {visible.map((action) => (
+            <button
+              key={action.type}
+              type="button"
+              className={
+                action.type === primary
+                  ? 'primary'
+                  : action.type === 'DECLARE_BANKRUPTCY'
+                    ? 'danger'
+                    : ''
+              }
+              onClick={() => run(action)}
+            >
+              {label(action)}
+            </button>
+          ))}
+        </div>
+      )}
       {error && (
         <p className="error" role="alert">
-          {t(`errors.${error.code}`)}
+          {t(`errors.${error.code}`, { defaultValue: error.message ?? error.code })}
         </p>
       )}
-      {phase.name === 'freePhase' && <p className="muted small">{t('turn.manageHint')}</p>}
+      {canAct && phase.name === 'freePhase' && (
+        <p className="muted small">{t('turn.manageHint')}</p>
+      )}
     </section>
   );
 }

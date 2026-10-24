@@ -6,12 +6,15 @@ import { formatEvent } from '../game/format';
 interface EventLogProps {
   state: GameState;
   events: GameEvent[];
-  log: GameLog;
+  /** Lokales Log (Hot-Seat). */
+  log?: GameLog;
+  /** Online: Adresse, unter der der Server das Log liefert. */
+  exportHref?: string;
 }
 
 const MAX_ENTRIES = 300;
 
-export function EventLog({ state, events, log }: EventLogProps) {
+export function EventLog({ state, events, log, exportHref }: EventLogProps) {
   const { t } = useTranslation();
   const [verdict, setVerdict] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -25,13 +28,14 @@ export function EventLog({ state, events, log }: EventLogProps) {
     return out;
   }, [events, state, t]);
 
-  const verify = () => {
+  const verify = async () => {
     try {
-      const result = replay(log);
+      const source = log ?? ((await fetch(exportHref!).then((r) => r.json())) as GameLog);
+      const result = replay(source);
       const same = JSON.stringify(result.state) === JSON.stringify(state);
       setVerdict(
         same
-          ? { ok: true, text: t('log.verifyOk', { count: log.actions.length }) }
+          ? { ok: true, text: t('log.verifyOk', { count: source.actions.length }) }
           : { ok: false, text: t('log.verifyFail', { error: 'state' }) },
       );
     } catch (error) {
@@ -40,6 +44,7 @@ export function EventLog({ state, events, log }: EventLogProps) {
   };
 
   const exportLog = () => {
+    if (!log) return;
     const blob = new Blob([JSON.stringify(log, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -54,12 +59,21 @@ export function EventLog({ state, events, log }: EventLogProps) {
       <div className="panel-header">
         <h2>{t('log.heading')}</h2>
         <div className="log-tools">
-          <button type="button" className="link" onClick={verify}>
-            {t('log.verify')}
-          </button>
-          <button type="button" className="link" onClick={exportLog}>
-            {t('log.export')}
-          </button>
+          {(log || exportHref) && (
+            <button type="button" className="link" onClick={() => void verify()}>
+              {t('log.verify')}
+            </button>
+          )}
+          {log && (
+            <button type="button" className="link" onClick={exportLog}>
+              {t('log.export')}
+            </button>
+          )}
+          {exportHref && (
+            <a className="link" href={exportHref} download="menelgame-log.json">
+              {t('log.export')}
+            </a>
+          )}
         </div>
       </div>
       {verdict && (

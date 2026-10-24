@@ -66,6 +66,9 @@ importers:
       '@menelgame/packs':
         specifier: workspace:*
         version: link:../../packages/packs
+      '@menelgame/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@menelgame/schema':
         specifier: workspace:*
         version: link:../../packages/schema

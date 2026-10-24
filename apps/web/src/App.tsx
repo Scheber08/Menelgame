@@ -1,34 +1,30 @@
-import { getLegalActions } from '@menelgame/engine';
-import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Board } from './board/Board';
-import { ActionBar } from './components/ActionBar';
-import { EventLog } from './components/EventLog';
-import { GameOver } from './components/GameOver';
-import { PlayerList } from './components/PlayerList';
-import { Setup } from './components/Setup';
-import { TileInfo } from './components/TileInfo';
-import { useHotSeatGame } from './game/useHotSeatGame';
+import { HotSeatPage } from './pages/HotSeatPage';
+import { Home } from './pages/Home';
+import { RoomPage } from './pages/RoomPage';
+import { navigate, usePath } from './router';
 
 export function App() {
   const { t } = useTranslation();
-  const { game, error, start, dispatch, reset } = useHotSeatGame();
-  const [selectedTileId, setSelectedTileId] = useState<string | null>(null);
-  const [gameOverDismissed, setGameOverDismissed] = useState(false);
-  const legal = useMemo(() => (game ? getLegalActions(game.state) : []), [game]);
+  const path = usePath();
+  const room = path.match(/^\/r\/([A-Za-z0-9]{6})\/?$/);
 
-  const newGame = () => {
-    if (game && game.state.phase.name !== 'gameOver' && !window.confirm(t('app.confirmNewGame')))
-      return;
-    setSelectedTileId(null);
-    setGameOverDismissed(false);
-    reset();
-  };
+  let page;
+  if (room) page = <RoomPage key={room[1]} code={room[1]!.toUpperCase()} />;
+  else if (path.startsWith('/lokal')) page = <HotSeatPage />;
+  else page = <Home />;
 
   return (
     <div className="app">
       <header className="app-header">
-        <div className="brand">
+        <a
+          className="brand"
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            navigate('/');
+          }}
+        >
           <span className="logo" aria-hidden="true">
             M
           </span>
@@ -36,53 +32,10 @@ export function App() {
             <div className="brand-name">{t('app.title')}</div>
             <div className="muted small">{t('app.tagline')}</div>
           </div>
-        </div>
-        {game && (
-          <button type="button" onClick={newGame}>
-            {t('app.newGame')}
-          </button>
-        )}
+        </a>
+        {room && <span className="header-code">{room[1]!.toUpperCase()}</span>}
       </header>
-
-      {!game ? (
-        <main className="setup-main">
-          <Setup onStart={start} />
-        </main>
-      ) : (
-        <main className="game">
-          <div className="board-wrap">
-            <Board
-              state={game.state}
-              events={game.events}
-              selectedTileId={selectedTileId}
-              onSelectTile={setSelectedTileId}
-            />
-          </div>
-          <aside className="sidebar">
-            <ActionBar state={game.state} legal={legal} error={error} dispatch={dispatch} />
-            <TileInfo
-              state={game.state}
-              tileId={selectedTileId}
-              legal={legal}
-              dispatch={dispatch}
-            />
-            <PlayerList
-              state={game.state}
-              selectedTileId={selectedTileId}
-              onSelectTile={setSelectedTileId}
-            />
-            <EventLog state={game.state} events={game.events} log={game.log} />
-          </aside>
-          {game.state.phase.name === 'gameOver' && !gameOverDismissed && (
-            <GameOver
-              state={game.state}
-              events={game.events}
-              onClose={() => setGameOverDismissed(true)}
-              onNewGame={newGame}
-            />
-          )}
-        </main>
-      )}
+      {page}
     </div>
   );
 }
