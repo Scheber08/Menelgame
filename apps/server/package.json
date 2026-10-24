@@ -1,0 +1,7 @@
+{
+  "name": "@menelgame/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Platzhalter: Cloudflare Worker + Durable Object pro Spielraum (Phase 2)"
+}

@@ -1,0 +1,669 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "id": "standard",
+    "name": "Neustadt",
+    "version": "1.0.0",
+    "author": "Menelgame",
+    "description": "Das neutrale Standard-Pack: 40 Felder in einer erfundenen Stadt."
+  },
+  "maxPlayers": 6,
+  "dice": {
+    "count": 2,
+    "sides": 6
+  },
+  "rules": {
+    "startingCash": 1500,
+    "passStartBonus": 200,
+    "landOnStartExtra": 0,
+    "auctions": true,
+    "freeParkingPot": false,
+    "jail": {
+      "bail": 50,
+      "maxTurns": 3,
+      "collectRentInJail": true
+    },
+    "tripleDoublesToJail": true,
+    "buildingLimit": {
+      "houses": 32,
+      "hotels": 12
+    },
+    "evenBuilding": true,
+    "monopolyRentMultiplier": 2,
+    "buildingSellPercent": 50,
+    "mortgageInterestPercent": 10,
+    "victory": {
+      "type": "lastStanding"
+    },
+    "bankruptcy": {
+      "mode": "toCreditor"
+    }
+  },
+  "layout": {
+    "shape": "square"
+  },
+  "groups": [
+    {
+      "id": "altstadt",
+      "name": "Altstadt",
+      "color": "#8b5a3c"
+    },
+    {
+      "id": "ufer",
+      "name": "Uferviertel",
+      "color": "#7cc4e6"
+    },
+    {
+      "id": "garten",
+      "name": "Gartenstadt",
+      "color": "#d65aa8"
+    },
+    {
+      "id": "markt",
+      "name": "Marktviertel",
+      "color": "#f08c2e"
+    },
+    {
+      "id": "kultur",
+      "name": "Kulturmeile",
+      "color": "#d64040"
+    },
+    {
+      "id": "mitte",
+      "name": "Neue Mitte",
+      "color": "#e8c832"
+    },
+    {
+      "id": "huegel",
+      "name": "Hügelviertel",
+      "color": "#3c9a5a"
+    },
+    {
+      "id": "villen",
+      "name": "Villenhang",
+      "color": "#2f4fa8"
+    },
+    {
+      "id": "verkehr",
+      "name": "Verkehr",
+      "color": "#4a4a4a"
+    },
+    {
+      "id": "versorger",
+      "name": "Versorger",
+      "color": "#8a8a8a"
+    }
+  ],
+  "tiles": [
+    {
+      "id": "start",
+      "name": "Start",
+      "type": "start"
+    },
+    {
+      "id": "fischergasse",
+      "name": "Fischergasse",
+      "type": "property",
+      "group": "altstadt",
+      "price": 60,
+      "houseCost": 50,
+      "rent": [3, 15, 40, 110, 180, 260]
+    },
+    {
+      "id": "stadtkasse-1",
+      "name": "Stadtkasse",
+      "type": "card",
+      "deck": "stadtkasse"
+    },
+    {
+      "id": "toepferweg",
+      "name": "Töpferweg",
+      "type": "property",
+      "group": "altstadt",
+      "price": 70,
+      "houseCost": 50,
+      "rent": [5, 25, 70, 200, 340, 470]
+    },
+    {
+      "id": "grundsteuer",
+      "name": "Grundsteuer",
+      "type": "tax",
+      "amount": 200
+    },
+    {
+      "id": "busbahnhof",
+      "name": "Busbahnhof",
+      "type": "station",
+      "group": "verkehr",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "schilfweg",
+      "name": "Schilfweg",
+      "type": "property",
+      "group": "ufer",
+      "price": 100,
+      "houseCost": 50,
+      "rent": [7, 35, 95, 280, 410, 560]
+    },
+    {
+      "id": "glueck-1",
+      "name": "Glückskarte",
+      "type": "card",
+      "deck": "glueck"
+    },
+    {
+      "id": "weidenufer",
+      "name": "Weidenufer",
+      "type": "property",
+      "group": "ufer",
+      "price": 100,
+      "houseCost": 50,
+      "rent": [7, 35, 95, 280, 410, 560]
+    },
+    {
+      "id": "moewenkai",
+      "name": "Möwenkai",
+      "type": "property",
+      "group": "ufer",
+      "price": 120,
+      "houseCost": 50,
+      "rent": [9, 45, 110, 310, 450, 600]
+    },
+    {
+      "id": "gefaengnis",
+      "name": "Gefängnis",
+      "type": "jail"
+    },
+    {
+      "id": "rosenbogen",
+      "name": "Rosenbogen",
+      "type": "property",
+      "group": "garten",
+      "price": 140,
+      "houseCost": 100,
+      "rent": [11, 55, 150, 430, 600, 760]
+    },
+    {
+      "id": "kraftwerk",
+      "name": "Kraftwerk",
+      "type": "utility",
+      "group": "versorger",
+      "price": 150,
+      "multipliers": [4, 10]
+    },
+    {
+      "id": "fliederhof",
+      "name": "Fliederhof",
+      "type": "property",
+      "group": "garten",
+      "price": 140,
+      "houseCost": 100,
+      "rent": [11, 55, 150, 430, 600, 760]
+    },
+    {
+      "id": "lavendelplatz",
+      "name": "Lavendelplatz",
+      "type": "property",
+      "group": "garten",
+      "price": 160,
+      "houseCost": 100,
+      "rent": [13, 65, 180, 500, 700, 880]
+    },
+    {
+      "id": "faehrhafen",
+      "name": "Fährhafen",
+      "type": "station",
+      "group": "verkehr",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "kornmarkt",
+      "name": "Kornmarkt",
+      "type": "property",
+      "group": "markt",
+      "price": 180,
+      "houseCost": 100,
+      "rent": [15, 75, 210, 580, 780, 960]
+    },
+    {
+      "id": "stadtkasse-2",
+      "name": "Stadtkasse",
+      "type": "card",
+      "deck": "stadtkasse"
+    },
+    {
+      "id": "kaesegasse",
+      "name": "Käsegasse",
+      "type": "property",
+      "group": "markt",
+      "price": 180,
+      "houseCost": 100,
+      "rent": [15, 75, 210, 580, 780, 960]
+    },
+    {
+      "id": "gewuerzhalle",
+      "name": "Gewürzhalle",
+      "type": "property",
+      "group": "markt",
+      "price": 200,
+      "houseCost": 100,
+      "rent": [17, 85, 240, 640, 850, 1030]
+    },
+    {
+      "id": "stadtpark",
+      "name": "Stadtpark",
+      "type": "freeParking"
+    },
+    {
+      "id": "buehnenweg",
+      "name": "Bühnenweg",
+      "type": "property",
+      "group": "kultur",
+      "price": 220,
+      "houseCost": 150,
+      "rent": [19, 95, 270, 700, 880, 1060]
+    },
+    {
+      "id": "glueck-2",
+      "name": "Glückskarte",
+      "type": "card",
+      "deck": "glueck"
+    },
+    {
+      "id": "galerieplatz",
+      "name": "Galerieplatz",
+      "type": "property",
+      "group": "kultur",
+      "price": 220,
+      "houseCost": 150,
+      "rent": [19, 95, 270, 700, 880, 1060]
+    },
+    {
+      "id": "orchesterring",
+      "name": "Orchesterring",
+      "type": "property",
+      "group": "kultur",
+      "price": 240,
+      "houseCost": 150,
+      "rent": [21, 105, 300, 760, 940, 1120]
+    },
+    {
+      "id": "seilbahn",
+      "name": "Seilbahnstation",
+      "type": "station",
+      "group": "verkehr",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "glasturm",
+      "name": "Glasturm",
+      "type": "property",
+      "group": "mitte",
+      "price": 260,
+      "houseCost": 150,
+      "rent": [23, 115, 330, 820, 1000, 1180]
+    },
+    {
+      "id": "lichthof",
+      "name": "Lichthof",
+      "type": "property",
+      "group": "mitte",
+      "price": 260,
+      "houseCost": 150,
+      "rent": [23, 115, 330, 820, 1000, 1180]
+    },
+    {
+      "id": "wasserturm",
+      "name": "Wasserturm",
+      "type": "utility",
+      "group": "versorger",
+      "price": 150,
+      "multipliers": [4, 10]
+    },
+    {
+      "id": "sternenpassage",
+      "name": "Sternenpassage",
+      "type": "property",
+      "group": "mitte",
+      "price": 280,
+      "houseCost": 150,
+      "rent": [25, 125, 360, 880, 1060, 1240]
+    },
+    {
+      "id": "ab-ins-gefaengnis",
+      "name": "Ab ins Gefängnis",
+      "type": "goToJail"
+    },
+    {
+      "id": "rebenhang",
+      "name": "Rebenhang",
+      "type": "property",
+      "group": "huegel",
+      "price": 300,
+      "houseCost": 200,
+      "rent": [27, 135, 400, 920, 1120, 1320]
+    },
+    {
+      "id": "aussichtsweg",
+      "name": "Aussichtsweg",
+      "type": "property",
+      "group": "huegel",
+      "price": 300,
+      "houseCost": 200,
+      "rent": [27, 135, 400, 920, 1120, 1320]
+    },
+    {
+      "id": "stadtkasse-3",
+      "name": "Stadtkasse",
+      "type": "card",
+      "deck": "stadtkasse"
+    },
+    {
+      "id": "sonnenterrasse",
+      "name": "Sonnenterrasse",
+      "type": "property",
+      "group": "huegel",
+      "price": 320,
+      "houseCost": 200,
+      "rent": [29, 145, 430, 980, 1180, 1380]
+    },
+    {
+      "id": "flugplatz",
+      "name": "Flugplatz",
+      "type": "station",
+      "group": "verkehr",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "glueck-3",
+      "name": "Glückskarte",
+      "type": "card",
+      "deck": "glueck"
+    },
+    {
+      "id": "zedernhain",
+      "name": "Zedernhain",
+      "type": "property",
+      "group": "villen",
+      "price": 360,
+      "houseCost": 200,
+      "rent": [36, 175, 500, 1100, 1320, 1520]
+    },
+    {
+      "id": "luxusabgabe",
+      "name": "Luxusabgabe",
+      "type": "tax",
+      "amount": 100
+    },
+    {
+      "id": "kristallhoehe",
+      "name": "Kristallhöhe",
+      "type": "property",
+      "group": "villen",
+      "price": 400,
+      "houseCost": 200,
+      "rent": [48, 210, 600, 1350, 1600, 1900]
+    }
+  ],
+  "decks": [
+    {
+      "id": "glueck",
+      "name": "Glückskarte",
+      "color": "#f2a93b",
+      "cards": [
+        {
+          "id": "zum-start",
+          "text": "Ein Taxi wartet schon: Fahre zum Start.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "start"
+            }
+          ]
+        },
+        {
+          "id": "orchester",
+          "text": "Konzertkarten gewonnen! Rücke vor zum Orchesterring.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "orchesterring"
+            }
+          ]
+        },
+        {
+          "id": "kristall",
+          "text": "Besichtigungstermin: Rücke vor zur Kristallhöhe.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "kristallhoehe"
+            }
+          ]
+        },
+        {
+          "id": "naechste-station",
+          "text": "Anschluss erwischt: Rücke vor zur nächsten Station. Gehört sie jemandem, zahlst du die doppelte Miete.",
+          "effects": [
+            {
+              "kind": "moveToNearest",
+              "tileType": "station",
+              "rentMultiplier": 2
+            }
+          ]
+        },
+        {
+          "id": "naechster-versorger",
+          "text": "Stromausfall! Rücke vor zum nächsten Versorger. Gehört er jemandem, zahlst du das Zehnfache deines Wurfs.",
+          "effects": [
+            {
+              "kind": "moveToNearest",
+              "tileType": "utility",
+              "utilityDiceMultiplier": 10
+            }
+          ]
+        },
+        {
+          "id": "zurueck",
+          "text": "Schlüssel vergessen: Gehe drei Felder zurück.",
+          "effects": [
+            {
+              "kind": "moveBy",
+              "steps": -3
+            }
+          ]
+        },
+        {
+          "id": "gefaengnis",
+          "text": "Erwischt beim Schwarzfahren: Gehe direkt ins Gefängnis.",
+          "effects": [
+            {
+              "kind": "goToJail"
+            }
+          ]
+        },
+        {
+          "id": "frei",
+          "text": "Ein guter Anwalt: Du kommst aus dem Gefängnis frei. Behalte diese Karte, bis du sie brauchst.",
+          "effects": [
+            {
+              "kind": "jailFreeCard"
+            }
+          ]
+        },
+        {
+          "id": "renovierung",
+          "text": "Fassadenrenovierung: Zahle 25 pro Haus und 100 pro Hotel.",
+          "effects": [
+            {
+              "kind": "repairs",
+              "perHouse": 25,
+              "perHotel": 100
+            }
+          ]
+        },
+        {
+          "id": "falschparker",
+          "text": "Falsch geparkt: Zahle 15.",
+          "effects": [
+            {
+              "kind": "pay",
+              "amount": 15
+            }
+          ]
+        },
+        {
+          "id": "dividende",
+          "text": "Deine Aktien zahlen Dividende: Erhalte 50.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 50
+            }
+          ]
+        },
+        {
+          "id": "vorsitz",
+          "text": "Du wirst Vorsitz im Kleingartenverein. Zahle jedem Spieler 50.",
+          "effects": [
+            {
+              "kind": "payEach",
+              "amount": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stadtkasse",
+      "name": "Stadtkasse",
+      "color": "#5aa0d6",
+      "cards": [
+        {
+          "id": "zum-start",
+          "text": "Die Stadt lädt zum Neujahrsempfang: Fahre zum Start.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "start"
+            }
+          ]
+        },
+        {
+          "id": "rechenfehler",
+          "text": "Rechenfehler im Rathaus zu deinen Gunsten: Erhalte 200.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 200
+            }
+          ]
+        },
+        {
+          "id": "zahnarzt",
+          "text": "Zahnarztrechnung: Zahle 50.",
+          "effects": [
+            {
+              "kind": "pay",
+              "amount": 50
+            }
+          ]
+        },
+        {
+          "id": "flohmarkt",
+          "text": "Erfolgreicher Flohmarkttag: Erhalte 50.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 50
+            }
+          ]
+        },
+        {
+          "id": "frei",
+          "text": "Die Stadt drückt ein Auge zu: Du kommst aus dem Gefängnis frei. Behalte diese Karte, bis du sie brauchst.",
+          "effects": [
+            {
+              "kind": "jailFreeCard"
+            }
+          ]
+        },
+        {
+          "id": "gefaengnis",
+          "text": "Ruhestörung nach Mitternacht: Gehe direkt ins Gefängnis.",
+          "effects": [
+            {
+              "kind": "goToJail"
+            }
+          ]
+        },
+        {
+          "id": "geburtstag",
+          "text": "Du hast Geburtstag! Jeder Spieler schenkt dir 10.",
+          "effects": [
+            {
+              "kind": "collectFromEach",
+              "amount": 10
+            }
+          ]
+        },
+        {
+          "id": "erbe",
+          "text": "Eine Tante hinterlässt dir 100.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 100
+            }
+          ]
+        },
+        {
+          "id": "kurklinik",
+          "text": "Kur im Bergsanatorium: Zahle 100.",
+          "effects": [
+            {
+              "kind": "pay",
+              "amount": 100
+            }
+          ]
+        },
+        {
+          "id": "strassenreparatur",
+          "text": "Straßenreparatur vor deinen Häusern: Zahle 40 pro Haus und 115 pro Hotel.",
+          "effects": [
+            {
+              "kind": "repairs",
+              "perHouse": 40,
+              "perHotel": 115
+            }
+          ]
+        },
+        {
+          "id": "steuerrueckzahlung",
+          "text": "Steuerrückzahlung: Erhalte 20.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 20
+            }
+          ]
+        },
+        {
+          "id": "kuchen",
+          "text": "Zweiter Platz beim Kuchenwettbewerb: Erhalte 10.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 10
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

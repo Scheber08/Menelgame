@@ -1,0 +1,18 @@
+{
+  "name": "@menelgame/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@menelgame/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@menelgame/packs": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}
