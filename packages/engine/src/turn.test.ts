@@ -23,7 +23,7 @@ describe('Würfeln und Bewegen', () => {
   });
 
   it('beendet den Zug und gibt an den nächsten Spieler weiter', () => {
-    let state = rigDice(newGame(), [[1, 2]]);
+    let state = rigDice(newGame({ rules: { auctions: false } }), [[1, 2]]);
     state = act(state, { type: 'ROLL_DICE', playerId: 'p1' }).state;
     // Feld 3 ist ein Grundstück → ablehnen, dann Zug beenden.
     state = act(state, { type: 'DECLINE', playerId: 'p1' }).state;

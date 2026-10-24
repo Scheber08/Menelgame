@@ -22,9 +22,18 @@ export const JailRulesSchema = z.object({
 export const BankruptcySchema = z.object({
   /**
    * toCreditor: Besitz geht an den Gläubiger (bei der Bank: zurück an die Bank).
-   * auction: Besitz wird versteigert (Phase 1: zurück an die Bank, Auktions-Hook).
+   * auction: Besitz geht an die Bank und wird sofort versteigert.
    */
   mode: z.enum(['toCreditor', 'auction']).default('toCreditor'),
+});
+
+export const TimersSchema = z.object({
+  /** Zeit pro Entscheidung in Sekunden; null = kein Zugtimer. */
+  turnSeconds: z.int().min(10).max(600).nullable().default(null),
+  /** Dauer einer Auktion ohne neue Gebote. */
+  auctionSeconds: z.int().min(5).max(120).default(15),
+  /** Nach einem Gebot bleiben mindestens so viele Sekunden. */
+  auctionExtendSeconds: z.int().min(2).max(60).default(8),
 });
 
 export const RulesSchema = z.object({
@@ -33,7 +42,7 @@ export const RulesSchema = z.object({
   passStartBonus: MoneySchema.default(200),
   /** Zusätzlicher Bonus, wenn man genau auf dem Startfeld landet (Hausregel, klassisch 0). */
   landOnStartExtra: MoneySchema.default(0),
-  /** Abgelehnte Grundstücke werden versteigert (Phase 1: nur Hook). */
+  /** Abgelehnte Grundstücke werden versteigert. */
   auctions: z.boolean().default(true),
   /** Steuern und Kartenstrafen landen im Topf, Frei Parken kassiert ihn (Hausregel). */
   freeParkingPot: z.boolean().default(false),
@@ -56,6 +65,11 @@ export const RulesSchema = z.object({
   /** Zinsaufschlag beim Ablösen einer Hypothek in Prozent. */
   mortgageInterestPercent: z.int().min(0).max(100).default(10),
   victory: VictorySchema.default({ type: 'lastStanding' }),
+  /**
+   * Uhren für Online-Spiele. Die Engine kennt keine Zeit; Server bzw. Oberfläche lösen bei
+   * Ablauf AUCTION_CLOSE bzw. die Standardaktion aus.
+   */
+  timers: TimersSchema.prefault({}),
   bankruptcy: BankruptcySchema.prefault({}),
 });
 
@@ -66,4 +80,5 @@ export const DiceSchema = z.object({
 
 export type Rules = z.infer<typeof RulesSchema>;
 export type Victory = z.infer<typeof VictorySchema>;
+export type Timers = z.infer<typeof TimersSchema>;
 export type DiceConfig = z.infer<typeof DiceSchema>;

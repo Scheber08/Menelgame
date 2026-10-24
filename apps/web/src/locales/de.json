@@ -20,13 +20,13 @@
     "startingCash": "Startgeld",
     "passStartBonus": "Bonus für Start",
     "freeParkingPot": "Steuern und Strafen in den Topf, Frei Parken kassiert",
-    "auctions": "Abgelehnte Grundstücke versteigern (Auktion kommt in Phase 2)",
+    "auctions": "Abgelehnte Grundstücke versteigern",
     "evenBuilding": "Gleichmäßig bauen",
     "collectRentInJail": "Miete im Gefängnis kassieren",
     "tripleDoublesToJail": "Dreimal Pasch → Gefängnis",
     "bankruptcy": "Bei Bankrott",
     "bankruptcyToCreditor": "Besitz an den Gläubiger",
-    "bankruptcyAuction": "Besitz versteigern (Phase 1: zurück an die Bank)",
+    "bankruptcyAuction": "Besitz versteigern",
     "victory": "Sieg",
     "victoryLastStanding": "Letzter übrig",
     "victoryMaxRounds": "Nach Runden",
@@ -48,7 +48,8 @@
     "freePhaseExtraRoll": "Pasch! Du darfst noch einmal würfeln.",
     "awaitingDebt": "{{debtor}} schuldet {{creditor}} {{amount}}. Verkaufe Gebäude oder nimm Hypotheken auf.",
     "gameOver": "Das Spiel ist vorbei.",
-    "manageHint": "Tipp: Klicke ein eigenes Feld an, um zu bauen oder eine Hypothek aufzunehmen."
+    "manageHint": "Tipp: Klicke ein eigenes Feld an, um zu bauen oder eine Hypothek aufzunehmen.",
+    "auction": "Versteigerung läuft – alle dürfen bieten."
   },
   "actions": {
     "ROLL_DICE": "Würfeln",
@@ -146,7 +147,6 @@
     "purchaseOffered": "{{tile}} ist frei ({{price}})",
     "purchased": "{{player}} kauft {{tile}} für {{price}}",
     "purchaseDeclined": "{{player}} kauft {{tile}} nicht",
-    "auctionSkipped": "Auktion für {{tile}} entfällt (kommt in Phase 2) – das Feld bleibt frei",
     "noRentMortgaged": "{{tile}} hat eine Hypothek – keine Miete",
     "noRentOwnerInJail": "Besitzer von {{tile}} sitzt im Gefängnis – keine Miete",
     "cardDrawn": "{{player}} zieht {{deck}}: „{{text}}“",
@@ -171,7 +171,20 @@
     "gameOverNoWinner": "Spielende",
     "buildingsHotel": "Hotel",
     "buildingsHouses_one": "{{count}} Haus",
-    "buildingsHouses_other": "{{count}} Häuser"
+    "buildingsHouses_other": "{{count}} Häuser",
+    "auctionStarted": "Versteigerung: {{tile}}",
+    "auctionBid": "{{player}} bietet {{amount}}",
+    "auctionPassed": "{{player}} steigt aus",
+    "auctionWon": "{{player}} ersteigert {{tile}} für {{amount}}",
+    "auctionUnsold": "{{tile}} findet keinen Käufer und bleibt frei",
+    "tradeProposed": "{{from}} macht {{to}} ein Angebot",
+    "tradeAccepted": "{{to}} nimmt das Angebot von {{from}} an",
+    "tradeRejected": "{{player}} lehnt ein Angebot ab",
+    "tradeCancelled_withdrawn": "Ein Angebot wurde zurückgezogen",
+    "tradeCancelled_invalid": "Ein Angebot ist hinfällig geworden",
+    "tradeMoney": "{{from}} zahlt {{amount}} an {{to}} (Handel)",
+    "rulesUpdated": "Der Host ändert die Regeln: {{changes}}",
+    "playerRemoved": "{{player}} wurde aus dem Spiel entfernt"
   },
   "gameOver": {
     "heading": "{{winner}} gewinnt!",
@@ -204,5 +217,23 @@
     "mortgaged": "Das Feld hat bereits eine Hypothek.",
     "notMortgaged": "Das Feld hat keine Hypothek.",
     "groupHasBuildings": "Erst alle Gebäude der Gruppe verkaufen."
+  },
+  "ruleNames": {
+    "startingCash": "Startgeld",
+    "passStartBonus": "Bonus für Start",
+    "landOnStartExtra": "Extra-Bonus auf Start",
+    "auctions": "Auktionen",
+    "freeParkingPot": "Frei-Parken-Topf",
+    "jail": "Gefängnis",
+    "tripleDoublesToJail": "Dreimal Pasch",
+    "buildingLimit": "Gebäudevorrat",
+    "evenBuilding": "Gleichmäßig bauen",
+    "monopolyRentMultiplier": "Gruppenbonus",
+    "buildingSellPercent": "Verkaufserlös",
+    "mortgageInterestPercent": "Hypothekenzins",
+    "victory": "Siegbedingung",
+    "timers": "Zeitlimits",
+    "bankruptcy": "Bankrott",
+    "dice": "Würfel"
   }
 }

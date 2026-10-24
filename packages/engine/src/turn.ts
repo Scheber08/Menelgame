@@ -1,3 +1,4 @@
+import { startAuctions } from './auction';
 import { emit, type Ctx } from './context';
 import { moveForward, startResolution, type Resolution } from './effects';
 import { activePlayers, currentPlayer, netWorth, ranking } from './selectors';
@@ -18,6 +19,12 @@ export function settle(ctx: Ctx, next: ResumePoint): void {
 
 export function resume(ctx: Ctx, point: ResumePoint): void {
   switch (point.kind) {
+    case 'awaitingRoll':
+      ctx.state.phase = { name: 'awaitingRoll' };
+      return;
+    case 'auction':
+      startAuctions(ctx, point.tiles, point.then);
+      return;
     case 'awaitingPurchase':
       ctx.state.phase = {
         name: 'awaitingPurchase',
@@ -112,6 +119,8 @@ export function endGame(
   const order = ranking(ctx.state);
   const winner = order[0]?.playerId ?? null;
   ctx.state.debts = [];
+  ctx.state.auction = null;
+  ctx.state.trades = [];
   ctx.state.phase = { name: 'gameOver', winner };
   emit(ctx, { type: 'gameOver', winner, reason, ranking: order });
 }

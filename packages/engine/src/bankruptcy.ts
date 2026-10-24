@@ -1,4 +1,4 @@
-import { startAuction } from './auction';
+import { leaveAuction } from './auction';
 import { emit, transfer, type Ctx } from './context';
 import {
   buildingRefund,
@@ -9,31 +9,60 @@ import {
   requirePlayer,
   tileState,
 } from './selectors';
+import { pruneTrades } from './trade';
 import { checkVictory, resume } from './turn';
-import type { Party, PlayerId, ResumePoint } from './types';
+import type { Party, Phase, PlayerId, ResumePoint } from './types';
+
+/** Bankrott des Schuldners gegenüber dem Gläubiger der ersten offenen Schuld. */
+export function declareBankruptcy(ctx: Ctx, playerId: PlayerId): void {
+  const creditor = ctx.state.debts[0]?.creditor ?? 'bank';
+  eliminatePlayer(ctx, playerId, creditor, 'bankrupt');
+}
+
+function phaseAsResume(phase: Phase): ResumePoint {
+  switch (phase.name) {
+    case 'awaitingPurchase':
+      return { kind: 'awaitingPurchase', tileId: phase.tileId, extraRoll: phase.extraRoll };
+    case 'freePhase':
+      return { kind: 'freePhase', extraRoll: phase.extraRoll };
+    case 'awaitingDebt':
+      return phase.resume;
+    default:
+      return { kind: 'awaitingRoll' };
+  }
+}
 
 /**
- * Bankrott des Schuldners der ersten offenen Schuld.
+ * Scheidet einen Spieler aus (Bankrott oder vom Host entfernt).
  *
- * - Gebäude gehen zum halben Preis (buildingSellPercent) an die Bank zurück.
- * - Modus toCreditor und Gläubiger ist ein Spieler: Bargeld, Felder (samt Hypotheken) und
- *   Gefängnis-frei-Karten gehen an ihn.
- * - Sonst (Bank, Topf oder Modus auction): Bargeld an den Gläubiger, Felder zurück an die
- *   Bank (bei auction über den Auktions-Hook), Karten zurück unter ihren Stapel.
+ * - Gebäude gehen zum Verkaufspreis (buildingSellPercent) an die Bank zurück.
+ * - Bankrott, Modus toCreditor und Gläubiger ist ein Spieler: Bargeld, Felder (samt
+ *   Hypotheken) und Gefängnis-frei-Karten gehen an ihn.
+ * - Sonst: Bargeld an den Gläubiger, Felder ohne Hypothek zurück an die Bank, Karten unter
+ *   ihren Stapel. Im Modus auction werden die Felder danach versteigert.
  */
-export function declareBankruptcy(ctx: Ctx, playerId: PlayerId): void {
+export function eliminatePlayer(
+  ctx: Ctx,
+  playerId: PlayerId,
+  creditor: Party,
+  reason: 'bankrupt' | 'removed',
+): void {
   const state = ctx.state;
-  const debt = state.debts[0];
-  if (!debt) return;
-  const creditor: Party = debt.creditor;
   const player = requirePlayer(state, playerId);
+  const wasCurrent = currentPlayer(state).id === playerId;
+  const creditorIsPlayer = creditor !== 'bank' && creditor !== 'pot';
   const toPlayer =
-    state.rules.bankruptcy.mode === 'toCreditor' && creditor !== 'bank' && creditor !== 'pot';
+    reason === 'bankrupt' && state.rules.bankruptcy.mode === 'toCreditor' && creditorIsPlayer;
+  const auctionTiles: string[] = [];
 
   player.bankrupt = true;
-  emit(ctx, { type: 'bankrupt', playerId, creditor });
+  emit(
+    ctx,
+    reason === 'removed'
+      ? { type: 'playerRemoved', playerId }
+      : { type: 'bankrupt', playerId, creditor },
+  );
 
-  // Gebäude liquidieren.
   for (const tile of ownedTiles(state, playerId)) {
     const ts = tileState(state, tile.id);
     if (tile.type !== 'property' || ts.buildings === 0) continue;
@@ -57,7 +86,8 @@ export function declareBankruptcy(ctx: Ctx, playerId: PlayerId): void {
       ts.owner = null;
       ts.mortgaged = false;
       emit(ctx, { type: 'propertyTransferred', tileId: tile.id, from: playerId, to: null });
-      if (state.rules.bankruptcy.mode === 'auction') startAuction(ctx, tile.id);
+      if (reason === 'bankrupt' && state.rules.bankruptcy.mode === 'auction')
+        auctionTiles.push(tile.id);
     }
   }
 
@@ -68,17 +98,25 @@ export function declareBankruptcy(ctx: Ctx, playerId: PlayerId): void {
   }
   player.jailFreeCards = [];
 
-  // Offene Schulden des Bankrotten verfallen; Forderungen an ihn gehen an die Bank.
+  // Offene Schulden des Ausgeschiedenen verfallen; Forderungen an ihn gehen an die Bank.
   state.debts = state.debts
     .filter((d) => d.debtor !== playerId)
     .map((d) => (d.creditor === playerId ? { ...d, creditor: 'bank' } : d));
+  pruneTrades(ctx);
 
   if (checkVictory(ctx)) return;
 
-  const phase = state.phase;
-  let next: ResumePoint =
-    phase.name === 'awaitingDebt' ? phase.resume : { kind: 'freePhase', extraRoll: false };
-  if (currentPlayer(state).id === playerId) next = { kind: 'advanceTurn' };
+  if (state.phase.name === 'auction' && state.auction) {
+    const auction = state.auction;
+    if (wasCurrent) auction.then = { kind: 'advanceTurn' };
+    auction.queue.push(...auctionTiles);
+    leaveAuction(ctx, playerId);
+    return;
+  }
+
+  let next = phaseAsResume(state.phase);
+  if (wasCurrent) next = { kind: 'advanceTurn' };
+  if (auctionTiles.length > 0) next = { kind: 'auction', tiles: auctionTiles, then: next };
 
   if (state.debts.length > 0) state.phase = { name: 'awaitingDebt', resume: next };
   else resume(ctx, next);

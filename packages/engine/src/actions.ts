@@ -1,8 +1,10 @@
 import { mortgageValueOf, type OwnableTile, type PropertyTile } from '@menelgame/schema';
-import { startAuction } from './auction';
+import { auctionHandlers, startAuctions } from './auction';
 import { declareBankruptcy } from './bankruptcy';
 import { charge, emit, transfer, type Ctx } from './context';
 import { moveForward, sendToJail, startResolution } from './effects';
+import { engineError, type ActionHandler } from './handler';
+import { hostHandlers } from './host';
 import { nextInt } from './rng';
 import {
   actingPlayerId,
@@ -16,55 +18,19 @@ import {
   tileState,
   unmortgageCost,
 } from './selectors';
+import { tradeHandlers } from './trade';
 import { advanceTurn, finishMovement, resume, settle } from './turn';
-import type {
-  Action,
-  ActionType,
-  DiceRoll,
-  EngineError,
-  ErrorCode,
-  GameState,
-  Phase,
+import {
+  isPlayerAction,
+  type Action,
+  type ActionType,
+  type DiceRoll,
+  type EngineError,
+  type GameState,
+  type Phase,
 } from './types';
 
-type ActionOf<T extends ActionType> = Extract<Action, { type: T }>;
-
-interface ActionHandler<T extends ActionType> {
-  /** Phasen, in denen die Aktion erlaubt ist. */
-  phases: readonly Phase['name'][];
-  /** Zusätzliche Prüfungen; Spieler und Phase sind schon geprüft. */
-  validate?: (state: GameState, action: ActionOf<T>) => EngineError | null;
-  execute: (ctx: Ctx, action: ActionOf<T>) => void;
-}
-
-const MESSAGES: Record<ErrorCode, string> = {
-  gameOver: 'Das Spiel ist vorbei.',
-  unknownPlayer: 'Unbekannter Spieler.',
-  unknownTile: 'Unbekanntes Feld.',
-  notYourTurn: 'Du bist nicht am Zug.',
-  wrongPhase: 'Diese Aktion ist gerade nicht möglich.',
-  insufficientFunds: 'Nicht genug Geld.',
-  notInJail: 'Du bist nicht im Gefängnis.',
-  inJail: 'Im Gefängnis nicht möglich.',
-  noJailFreeCard: 'Keine Gefängnis-frei-Karte vorhanden.',
-  mustRollAgain: 'Nach einem Pasch musst du noch einmal würfeln.',
-  notOwner: 'Das Feld gehört dir nicht.',
-  notBuildable: 'Auf diesem Feld kann nicht gebaut werden.',
-  incompleteGroup: 'Dir gehört nicht die ganze Gruppe.',
-  groupMortgaged: 'Ein Feld der Gruppe ist mit einer Hypothek belastet.',
-  maxBuildings: 'Hier steht schon ein Hotel.',
-  noBuildings: 'Hier stehen keine Gebäude.',
-  unevenBuilding: 'Es muss gleichmäßig gebaut werden.',
-  bankOutOfHouses: 'Die Bank hat keine Häuser mehr.',
-  bankOutOfHotels: 'Die Bank hat keine Hotels mehr.',
-  mortgaged: 'Das Feld ist bereits mit einer Hypothek belastet.',
-  notMortgaged: 'Das Feld hat keine Hypothek.',
-  groupHasBuildings: 'Erst alle Gebäude der Gruppe verkaufen.',
-};
-
-export function engineError(code: ErrorCode): EngineError {
-  return { code, message: MESSAGES[code] };
-}
+export { engineError };
 
 function rollDice(state: GameState): DiceRoll {
   const dice = Array.from(
@@ -169,8 +135,9 @@ const handlers: { [T in ActionType]: ActionHandler<T> } = {
     execute: (ctx, action) => {
       const phase = ctx.state.phase as Extract<Phase, { name: 'awaitingPurchase' }>;
       emit(ctx, { type: 'purchaseDeclined', playerId: action.playerId, tileId: phase.tileId });
-      if (ctx.state.rules.auctions) startAuction(ctx, phase.tileId);
-      ctx.state.phase = { name: 'freePhase', extraRoll: phase.extraRoll };
+      const next = { kind: 'freePhase', extraRoll: phase.extraRoll } as const;
+      if (ctx.state.rules.auctions) startAuctions(ctx, [phase.tileId], next);
+      else resume(ctx, next);
     },
   },
 
@@ -364,6 +331,10 @@ const handlers: { [T in ActionType]: ActionHandler<T> } = {
     phases: ['awaitingDebt'],
     execute: (ctx, action) => declareBankruptcy(ctx, action.playerId),
   },
+
+  ...auctionHandlers,
+  ...tradeHandlers,
+  ...hostHandlers,
 };
 
 /** Prüft eine Aktion gegen den Zustand, ohne ihn zu verändern. */
@@ -371,9 +342,16 @@ export function validateAction(state: GameState, action: Action): EngineError | 
   if (state.phase.name === 'gameOver') return engineError('gameOver');
   const handler = handlers[action.type] as ActionHandler<ActionType> | undefined;
   if (!handler) return engineError('wrongPhase');
-  const player = state.players.find((p) => p.id === action.playerId);
-  if (!player || player.bankrupt) return engineError('unknownPlayer');
-  if (actingPlayerId(state) !== action.playerId) return engineError('notYourTurn');
+  const actor = handler.actor ?? 'acting';
+  if (actor === 'system') {
+    if (isPlayerAction(action)) return engineError('wrongPhase');
+  } else {
+    if (!isPlayerAction(action)) return engineError('unknownPlayer');
+    const player = state.players.find((p) => p.id === action.playerId);
+    if (!player || player.bankrupt) return engineError('unknownPlayer');
+    if (actor === 'acting' && actingPlayerId(state) !== action.playerId)
+      return engineError('notYourTurn');
+  }
   if (!handler.phases.includes(state.phase.name)) return engineError('wrongPhase');
   return handler.validate?.(state, action as never) ?? null;
 }

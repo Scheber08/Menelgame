@@ -52,20 +52,62 @@ export interface DiceRoll {
   isDouble: boolean;
 }
 
-/** Wohin es nach dem Begleichen aller Schulden weitergeht. */
+/** Wohin es nach Schulden oder einer Auktion weitergeht. */
 export type ResumePoint =
+  | { kind: 'awaitingRoll' }
   | { kind: 'awaitingPurchase'; tileId: string; extraRoll: boolean }
   | { kind: 'freePhase'; extraRoll: boolean }
   /** Nach erzwungener Kaution: Spieler zieht die gewürfelte Augenzahl. */
   | { kind: 'moveAfterBail'; steps: number }
-  | { kind: 'advanceTurn' };
+  | { kind: 'advanceTurn' }
+  /** Erst diese Felder versteigern, dann weiter. */
+  | { kind: 'auction'; tiles: string[]; then: ResumePoint };
 
 export type Phase =
   | { name: 'awaitingRoll' }
   | { name: 'awaitingPurchase'; tileId: string; extraRoll: boolean }
   | { name: 'freePhase'; extraRoll: boolean }
   | { name: 'awaitingDebt'; resume: ResumePoint }
+  /** Versteigerung läuft; Details in state.auction. Alle aktiven Spieler dürfen bieten. */
+  | { name: 'auction' }
   | { name: 'gameOver'; winner: PlayerId | null };
+
+export type PhaseName = Phase['name'];
+
+export interface AuctionState {
+  tileId: string;
+  highestBid: number;
+  highestBidder: PlayerId | null;
+  /** Spieler, die ausgestiegen sind. */
+  passed: PlayerId[];
+  /** Weitere Felder, die danach versteigert werden. */
+  queue: string[];
+  /** Wohin es nach der letzten Versteigerung geht. */
+  then: ResumePoint;
+}
+
+/** Was eine Seite eines Tauschs abgibt. */
+export interface TradeBundle {
+  cash: number;
+  tiles: string[];
+  jailFreeCards: number;
+}
+
+/**
+ * Offenes Tauschangebot. Später (Phase 6) kommen Vereinbarungen mit Laufzeit dazu, die
+ * beim Annehmen zu Einträgen in state.agreements werden.
+ */
+export interface TradeOffer {
+  id: string;
+  from: PlayerId;
+  to: PlayerId;
+  /** Was `from` abgibt. */
+  give: TradeBundle;
+  /** Was `from` dafür bekommt. */
+  receive: TradeBundle;
+  /** Antwort auf dieses Angebot (Gegenangebot), sonst null. */
+  counterTo: string | null;
+}
 
 /**
  * Laufende Vereinbarung zwischen Spielern (Phase 6: Mietfreiheit, Ratenzahlung,
@@ -80,7 +122,7 @@ export interface Agreement {
   data: Record<string, unknown>;
 }
 
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2;
 
 export interface GameState {
   stateVersion: typeof STATE_VERSION;
@@ -98,6 +140,9 @@ export interface GameState {
   currentPlayer: number;
   phase: Phase;
   debts: Debt[];
+  auction: AuctionState | null;
+  trades: TradeOffer[];
+  nextTradeId: number;
   agreements: Agreement[];
   lastRoll: DiceRoll | null;
   /** Zählt ab 1; erhöht sich, wenn der erste aktive Spieler wieder dran ist. */
@@ -108,7 +153,8 @@ export interface GameState {
   actionCount: number;
 }
 
-export type Action =
+/** Aktionen, die ein Spieler auslöst. */
+export type PlayerAction =
   | { type: 'ROLL_DICE'; playerId: PlayerId }
   | { type: 'BUY'; playerId: PlayerId }
   | { type: 'DECLINE'; playerId: PlayerId }
@@ -120,9 +166,43 @@ export type Action =
   | { type: 'PAY_BAIL'; playerId: PlayerId }
   | { type: 'USE_JAIL_CARD'; playerId: PlayerId }
   | { type: 'PAY_DEBT'; playerId: PlayerId }
-  | { type: 'DECLARE_BANKRUPTCY'; playerId: PlayerId };
+  | { type: 'DECLARE_BANKRUPTCY'; playerId: PlayerId }
+  | { type: 'AUCTION_BID'; playerId: PlayerId; amount: number }
+  | { type: 'AUCTION_PASS'; playerId: PlayerId }
+  | {
+      type: 'PROPOSE_TRADE';
+      playerId: PlayerId;
+      to: PlayerId;
+      give: TradeBundle;
+      receive: TradeBundle;
+    }
+  | {
+      type: 'COUNTER_TRADE';
+      playerId: PlayerId;
+      tradeId: string;
+      give: TradeBundle;
+      receive: TradeBundle;
+    }
+  | { type: 'ACCEPT_TRADE'; playerId: PlayerId; tradeId: string }
+  | { type: 'REJECT_TRADE'; playerId: PlayerId; tradeId: string }
+  | { type: 'CANCEL_TRADE'; playerId: PlayerId; tradeId: string };
 
+/**
+ * Aktionen ohne Spieler: Uhr (Auktionsende) und Host-Rechte. Der Server bzw. die
+ * Hot-Seat-Oberfläche entscheidet, wer sie auslösen darf.
+ */
+export type SystemAction =
+  | { type: 'AUCTION_CLOSE' }
+  | { type: 'UPDATE_RULES'; rules: Rules; dice: DiceConfig }
+  | { type: 'REMOVE_PLAYER'; targetId: PlayerId };
+
+export type Action = PlayerAction | SystemAction;
 export type ActionType = Action['type'];
+export type PlayerActionType = PlayerAction['type'];
+
+export function isPlayerAction(action: Action): action is PlayerAction {
+  return 'playerId' in action;
+}
 
 export type MoneyReason =
   | 'passStart'
@@ -137,6 +217,8 @@ export type MoneyReason =
   | 'mortgage'
   | 'unmortgage'
   | 'freeParking'
+  | 'auction'
+  | 'trade'
   | 'bankruptcy';
 
 export type JailReason = 'tile' | 'card' | 'tripleDoubles';
@@ -151,7 +233,17 @@ export type GameEvent =
   | { type: 'purchaseOffered'; playerId: PlayerId; tileId: string; price: number }
   | { type: 'purchased'; playerId: PlayerId; tileId: string; price: number }
   | { type: 'purchaseDeclined'; playerId: PlayerId; tileId: string }
-  | { type: 'auctionSkipped'; tileId: string }
+  | { type: 'auctionStarted'; tileId: string }
+  | { type: 'auctionBid'; playerId: PlayerId; tileId: string; amount: number }
+  | { type: 'auctionPassed'; playerId: PlayerId; tileId: string }
+  | { type: 'auctionWon'; playerId: PlayerId; tileId: string; amount: number }
+  | { type: 'auctionUnsold'; tileId: string }
+  | { type: 'tradeProposed'; trade: TradeOffer }
+  | { type: 'tradeAccepted'; tradeId: string; from: PlayerId; to: PlayerId }
+  | { type: 'tradeRejected'; tradeId: string; by: PlayerId }
+  | { type: 'tradeCancelled'; tradeId: string; reason: 'withdrawn' | 'invalid' | 'countered' }
+  | { type: 'rulesUpdated'; changes: string[] }
+  | { type: 'playerRemoved'; playerId: PlayerId }
   | { type: 'rentDue'; playerId: PlayerId; owner: PlayerId; tileId: string; amount: number }
   | { type: 'noRent'; playerId: PlayerId; tileId: string; why: 'mortgaged' | 'ownerInJail' }
   | { type: 'cardDrawn'; playerId: PlayerId; deckId: string; cardId: string; text: string }
@@ -198,7 +290,15 @@ export type ErrorCode =
   | 'bankOutOfHotels'
   | 'mortgaged'
   | 'notMortgaged'
-  | 'groupHasBuildings';
+  | 'groupHasBuildings'
+  | 'bidTooLow'
+  | 'alreadyPassed'
+  | 'highestBidder'
+  | 'unknownTrade'
+  | 'notTradeParty'
+  | 'invalidTrade'
+  | 'tooManyTrades'
+  | 'invalidRules';
 
 export interface EngineError {
   code: ErrorCode;

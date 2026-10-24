@@ -47,6 +47,9 @@ export function ActionBar({ state, legal, error, dispatch }: ActionBarProps) {
     case 'freePhase':
       hint = phase.extraRoll ? t('turn.freePhaseExtraRoll') : t('turn.freePhase');
       break;
+    case 'auction':
+      hint = t('turn.auction');
+      break;
     case 'awaitingDebt':
       hint = debt
         ? t('turn.awaitingDebt', {

@@ -84,6 +84,8 @@ export function formatEvent(t: TFunction, state: GameState, event: GameEvent): s
           return t('events.bailPaid', { from, amount });
         case 'bankruptcy':
           return t('events.bankruptcyTransfer', { from, to, amount });
+        case 'trade':
+          return t('events.tradeMoney', { from, to, amount });
         default:
           return null;
       }
@@ -104,8 +106,40 @@ export function formatEvent(t: TFunction, state: GameState, event: GameEvent): s
         player: name(event.playerId),
         tile: tileName(state, event.tileId),
       });
-    case 'auctionSkipped':
-      return t('events.auctionSkipped', { tile: tileName(state, event.tileId) });
+    case 'auctionStarted':
+      return t('events.auctionStarted', { tile: tileName(state, event.tileId) });
+    case 'auctionBid':
+      return t('events.auctionBid', {
+        player: name(event.playerId),
+        amount: money(event.amount),
+      });
+    case 'auctionPassed':
+      return t('events.auctionPassed', { player: name(event.playerId) });
+    case 'auctionWon':
+      return t('events.auctionWon', {
+        player: name(event.playerId),
+        tile: tileName(state, event.tileId),
+        amount: money(event.amount),
+      });
+    case 'auctionUnsold':
+      return t('events.auctionUnsold', { tile: tileName(state, event.tileId) });
+    case 'tradeProposed':
+      return t('events.tradeProposed', {
+        from: name(event.trade.from),
+        to: name(event.trade.to),
+      });
+    case 'tradeAccepted':
+      return t('events.tradeAccepted', { from: name(event.from), to: name(event.to) });
+    case 'tradeRejected':
+      return t('events.tradeRejected', { player: name(event.by) });
+    case 'tradeCancelled':
+      return event.reason === 'countered' ? null : t(`events.tradeCancelled_${event.reason}`);
+    case 'rulesUpdated':
+      return t('events.rulesUpdated', {
+        changes: event.changes.map((c) => t(`ruleNames.${c}`, { defaultValue: c })).join(', '),
+      });
+    case 'playerRemoved':
+      return t('events.playerRemoved', { player: name(event.playerId) });
     case 'rentDue':
       return null;
     case 'noRent':

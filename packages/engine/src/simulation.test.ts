@@ -1,29 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { apply, getLegalActions } from './apply';
+import { apply } from './apply';
 import { replay } from './replay';
 import { HOTEL } from './selectors';
 import { newGame, type NewGameOptions } from './test/helpers';
+import { nextTestMove } from './test/policy';
 import type { Action, GameEvent, GameState } from './types';
-
-/**
- * Einfache, deterministische Strategie für Testspiele: kauft alles, baut mit Reserve,
- * liquidiert in Schulden und gibt erst auf, wenn nichts mehr geht.
- */
-function choose(state: GameState, actions: Action[]): Action {
-  const find = (type: Action['type']) => actions.find((a) => a.type === type);
-  const me = state.players.find((p) => p.id === actions[0]!.playerId)!;
-
-  if (state.phase.name === 'awaitingDebt') {
-    return (
-      find('PAY_DEBT') ?? find('SELL_BUILDING') ?? find('MORTGAGE') ?? find('DECLARE_BANKRUPTCY')!
-    );
-  }
-  if (state.phase.name === 'awaitingPurchase') return find('BUY') ?? find('DECLINE')!;
-  if (me.inJail && find('USE_JAIL_CARD')) return find('USE_JAIL_CARD')!;
-  if (me.cash > 600 && find('UNMORTGAGE')) return find('UNMORTGAGE')!;
-  if (me.cash > 300 && find('BUILD')) return find('BUILD')!;
-  return find('ROLL_DICE') ?? find('END_TURN')!;
-}
 
 function playGame(
   seed: number,
@@ -36,9 +17,7 @@ function playGame(
   const actions: Action[] = [];
   const events: GameEvent[] = [];
   while (state.phase.name !== 'gameOver' && actions.length < maxActions) {
-    const legal = getLegalActions(state);
-    expect(legal.length).toBeGreaterThan(0);
-    const action = choose(state, legal);
+    const action = nextTestMove(state);
     const result = apply(state, action);
     expect(result.ok).toBe(true);
     actions.push(action);
@@ -68,14 +47,12 @@ function checkInvariants(state: GameState): void {
 }
 
 describe('Komplettes Spiel', () => {
-  // Ohne Handel (ab Phase 2) entstehen mit Standardregeln nicht immer Farbgruppen; daher
-  // laufen manche Spiele auch mit knapperem Startgeld, damit sie sicher enden.
   it.each([
-    [3, 2, {}],
+    [1, 2, {}],
     [7, 3, {}],
-    [4, 4, {}],
-    [2026, 4, { startingCash: 800, passStartBonus: 50 }],
-    [1, 2, { passStartBonus: 0, freeParkingPot: true, bankruptcy: { mode: 'auction' as const } }],
+    [2026, 4, {}],
+    [4, 4, { auctions: false }],
+    [5, 3, { freeParkingPot: true, bankruptcy: { mode: 'auction' as const } }],
   ])(
     'Seed %i mit %i Spielern (%o) endet und lässt sich exakt nachspielen',
     (seed, players, rules) => {

@@ -1,4 +1,6 @@
-export { apply, getLegalActions } from './apply';
+export { apply, getDefaultAction, getLegalActions } from './apply';
+export { remainingBidders } from './auction';
+export { MAX_OPEN_TRADES, validateOffer } from './trade';
 export { validateAction, engineError } from './actions';
 export { createGame, type GameSetup, type PlayerSetup } from './create';
 export { replay, type GameLog, type ReplayResult } from './replay';

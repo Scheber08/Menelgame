@@ -37,10 +37,11 @@ describe('Kaufen', () => {
     expectError(state, { type: 'BUY', playerId: 'p1' }, 'insufficientFunds');
   });
 
-  it('ruft beim Ablehnen den Auktions-Hook auf, wenn Auktionen aktiv sind', () => {
+  it('startet beim Ablehnen eine Auktion, wenn Auktionen aktiv sind', () => {
     const on = landOn(newGame({ rules: { auctions: true } }), 'p1', 'busbahnhof').state;
     const declined = act(on, { type: 'DECLINE', playerId: 'p1' });
-    expect(declined.events).toContainEqual({ type: 'auctionSkipped', tileId: 'busbahnhof' });
+    expect(declined.events).toContainEqual({ type: 'auctionStarted', tileId: 'busbahnhof' });
+    expect(declined.state.phase).toEqual({ name: 'auction' });
     expect(declined.state.tiles.busbahnhof?.owner).toBeNull();
 
     const off = landOn(newGame({ rules: { auctions: false } }), 'p1', 'busbahnhof').state;

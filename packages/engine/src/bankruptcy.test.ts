@@ -106,16 +106,24 @@ describe('Bankrott', () => {
     expect(cash(next, 'p2')).toBe(1500);
   });
 
-  it('nutzt im Modus auction den Auktions-Hook', () => {
+  it('versteigert im Modus auction die Felder des Bankrotten', () => {
     const state = give(
       deepInDebt({ players: 3, rules: { bankruptcy: { mode: 'auction' } } }),
       'p1',
       'busbahnhof',
     );
     const { state: next, events } = act(state, { type: 'DECLARE_BANKRUPTCY', playerId: 'p1' });
-    expect(events).toContainEqual({ type: 'auctionSkipped', tileId: 'busbahnhof' });
+    expect(events).toContainEqual({ type: 'auctionStarted', tileId: 'busbahnhof' });
+    expect(next.phase).toEqual({ name: 'auction' });
+    expect(next.auction).toMatchObject({ tileId: 'busbahnhof', then: { kind: 'advanceTurn' } });
     expect(next.tiles.busbahnhof?.owner).toBeNull();
     expect(cash(next, 'p2')).toBe(1505);
+    // p2 ersteigert die Station, danach ist p2 am Zug.
+    let s = act(next, { type: 'AUCTION_BID', playerId: 'p2', amount: 120 }).state;
+    s = act(s, { type: 'AUCTION_PASS', playerId: 'p3' }).state;
+    expect(s.tiles.busbahnhof?.owner).toBe('p2');
+    expect(s.currentPlayer).toBe(1);
+    expect(s.phase).toEqual({ name: 'awaitingRoll' });
   });
 
   it('beendet das Spiel, wenn nur noch einer übrig ist', () => {
