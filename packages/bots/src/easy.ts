@@ -1,6 +1,7 @@
 import { ownableById, type PlayerAction } from '@menelgame/engine';
 import { all, find, type Strategy } from './strategy';
-import { bundleWorth, cashOf } from './valuation';
+import { uniformOdds } from './landing';
+import { bundleWorth, cashOf, termsWorth } from './valuation';
 import { chance } from './view';
 
 /**
@@ -11,8 +12,9 @@ export const easy: Strategy = {
   respondTrade(view, me, offer) {
     const gain = bundleWorth(view, offer.give, me, true);
     const loss = bundleWorth(view, offer.receive, me, false);
-    // Nur sehr gute Angebote annehmen.
-    return gain >= loss * 2 + 50
+    const terms = termsWorth(view, offer.terms, me, uniformOdds(view));
+    // Nur sehr gute Angebote annehmen; Vereinbarungen sind Leicht eher suspekt.
+    return gain + Math.min(0, terms) * 1.5 + Math.max(0, terms) * 0.5 >= loss * 2 + 50
       ? { type: 'ACCEPT_TRADE', playerId: me, tradeId: offer.id }
       : { type: 'REJECT_TRADE', playerId: me, tradeId: offer.id };
   },

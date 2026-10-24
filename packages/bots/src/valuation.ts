@@ -4,11 +4,14 @@ import {
   calculateRent,
   groupTiles,
   ownedCountInGroup,
+  variableValue,
+  type AgreementTerm,
   type GameState,
   type PlayerId,
   type TradeBundle,
 } from '@menelgame/engine';
 import { isOwnable, mortgageValueOf, type BaseEffect, type OwnableTile } from '@menelgame/schema';
+import { landingsPerRound, oddsOf, ROLLS_PER_TURN } from './landing';
 
 export function cashOf(state: GameState, playerId: PlayerId): number {
   return state.players.find((p) => p.id === playerId)?.cash ?? 0;
@@ -83,6 +86,55 @@ export function bundleWorth(
   return worth;
 }
 
+/** Miete, die ein Feld gerade bringt (Werke mit mittlerem Wurf 7). */
+export function currentRent(state: GameState, tile: OwnableTile, owner: PlayerId): number {
+  if (state.tiles[tile.id]?.mortgaged) return 0;
+  if (tile.type === 'utility') {
+    const owned = ownedCountInGroup(state, owner, tile.group);
+    return 7 * (tile.multipliers[Math.min(owned, tile.multipliers.length) - 1] ?? 0);
+  }
+  return calculateRent(state, tile, owner);
+}
+
+/**
+ * Geldwert von Vereinbarungen aus Sicht von `me` (positiv = gut für mich). `odds` sind
+ * Landewahrscheinlichkeiten pro Feld; Raten werden leicht abgezinst (Ausfallrisiko).
+ */
+export function termsWorth(
+  state: GameState,
+  terms: readonly AgreementTerm[],
+  me: PlayerId,
+  odds: number[],
+): number {
+  let worth = 0;
+  for (const term of terms) {
+    switch (term.kind) {
+      case 'installments':
+        worth += (term.payer === me ? -1 : 0.85) * term.amount * term.rounds;
+        break;
+      case 'rentFree':
+      case 'profitShare': {
+        // Erwartete Miete, die der Begünstigte zahlen würde bzw. die geteilt wird.
+        let perRound = 0;
+        for (const tileId of term.tiles) {
+          const tile = state.pack.tiles.find((t) => t.id === tileId);
+          if (!tile || !isOwnable(tile)) continue;
+          const rent = currentRent(state, tile, term.owner) * 1.2;
+          const landings = landingsPerRound(state, odds, tileId, term.owner);
+          perRound +=
+            term.kind === 'rentFree'
+              ? rent * oddsOf(state, odds, tileId) * ROLLS_PER_TURN
+              : (rent * landings * term.percent) / 100;
+        }
+        const value = perRound * term.rounds;
+        worth += term.owner === me ? -value : value;
+        break;
+      }
+    }
+  }
+  return worth;
+}
+
 /** Summe der Grundstückspreise einer Gruppe. */
 export function groupPrice(state: GameState, groupId: string): number {
   return groupTiles(state, groupId).reduce((sum, t) => sum + t.price, 0);
@@ -126,6 +178,9 @@ export function estimateEffects(
         break;
       case 'jailFreeCard':
         value += 50;
+        break;
+      case 'collectVariable':
+        value += Math.trunc((variableValue(state, e.variable, me) * e.percent) / 100);
         break;
       default:
         break;

@@ -8,18 +8,20 @@ import {
   type PlayerId,
 } from '@menelgame/engine';
 import { easy } from './easy';
+import { hard } from './hard';
 import { medium } from './medium';
 import { find, settleDebt, type Strategy } from './strategy';
 import { estimateEffects } from './valuation';
 import { botView, chance, newBotMemory, type BotMemory } from './view';
 
 export { botView, newBotMemory, type BotMemory } from './view';
-export { cashReserve, tileWorth } from './valuation';
+export { landingOdds } from './landing';
+export { cashReserve, termsWorth, tileWorth } from './valuation';
 
-export type BotLevel = 'easy' | 'medium';
-export const BOT_LEVELS: readonly BotLevel[] = ['easy', 'medium'];
+export type BotLevel = 'easy' | 'medium' | 'hard';
+export const BOT_LEVELS: readonly BotLevel[] = ['easy', 'medium', 'hard'];
 
-const strategies: Record<BotLevel, Strategy> = { easy, medium };
+const strategies: Record<BotLevel, Strategy> = { easy, medium, hard };
 
 /**
  * Nächste Aktion eines Bots – oder null, wenn er gerade nichts tun muss. Der Bot sieht nur,
@@ -78,9 +80,9 @@ export function decideBot(
       break;
     case 'awaitingChoice': {
       const options = view.phase.options;
-      // Mittel nimmt die Möglichkeit mit dem besten geschätzten Geldwert, Leicht würfelt.
+      // Mittel und Schwer nehmen die Möglichkeit mit dem besten geschätzten Geldwert, Leicht würfelt.
       const option =
-        level === 'medium'
+        level !== 'easy'
           ? options.reduce(
               (best, o, i) =>
                 estimateEffects(view, playerId, o.effects) >

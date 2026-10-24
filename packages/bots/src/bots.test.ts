@@ -9,7 +9,7 @@ import {
 import { standardPack } from '@menelgame/packs';
 import type { Rules } from '@menelgame/schema';
 import { describe, expect, it } from 'vitest';
-import { decideBot, newBotMemory, type BotLevel, type BotMemory } from './index';
+import { decideBot, landingOdds, newBotMemory, type BotLevel, type BotMemory } from './index';
 
 function newGame(levels: BotLevel[], seed: number, rules: Partial<Rules> = {}): GameState {
   return createGame({
@@ -62,6 +62,8 @@ describe('Bots spielen allein', () => {
     [['medium', 'medium', 'medium'], 13],
     [['easy', 'medium', 'easy', 'medium'], 14],
     [['medium', 'easy', 'medium', 'medium', 'easy', 'medium'], 15],
+    [['hard', 'medium'], 16],
+    [['hard', 'hard', 'medium', 'easy'], 17],
   ])('%j mit Seed %i spielen ohne Hänger bis zum Ende', (levels, seed) => {
     const game = playBots(levels, seed, 40_000);
     expect(game.state.phase.name).toBe('gameOver');
@@ -101,7 +103,7 @@ describe('Bots schummeln nicht', () => {
         ),
       };
       for (const p of state.players) {
-        for (const level of ['easy', 'medium'] as const) {
+        for (const level of ['easy', 'medium', 'hard'] as const) {
           expect(decideBot(tampered, p.id, level, newBotMemory())).toEqual(
             decideBot(state, p.id, level, newBotMemory()),
           );
@@ -265,5 +267,74 @@ describe('Bots auf Brettern mit eigenen Feldtypen', () => {
       }
       expect(state.phase.name).toBe('gameOver');
     }
+  });
+});
+
+describe('Stufe Schwer', () => {
+  function withTiles(state: GameState, owners: Record<string, string>): GameState {
+    const tiles = { ...state.tiles };
+    for (const [id, owner] of Object.entries(owners)) tiles[id] = { ...tiles[id]!, owner };
+    return { ...state, tiles };
+  }
+
+  it('simuliert Landewahrscheinlichkeiten mit der Engine', () => {
+    const state = newGame(['hard', 'hard'], 1);
+    const started = performance.now();
+    const odds = landingOdds(state);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(odds.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 5);
+    // Das Gefängnis ist das meistbesuchte Feld, „Ab ins Gefängnis“ endet nie dort.
+    const jail = state.pack.tiles.findIndex((t) => t.type === 'jail');
+    const goToJail = state.pack.tiles.findIndex((t) => t.type === 'goToJail');
+    expect(Math.max(...odds)).toBe(odds[jail]);
+    expect(odds[goToJail]).toBeLessThan(1 / state.pack.tiles.length / 2);
+    // Zweiter Aufruf kommt aus dem Speicher.
+    expect(landingOdds(state)).toBe(odds);
+  });
+
+  it('bietet Ratenzahlung an, wenn das Bargeld nicht reicht', () => {
+    let state = withTiles(newGame(['hard', 'medium'], 1), {
+      schilfweg: 'p1',
+      weidenufer: 'p1',
+      moewenkai: 'p2',
+    });
+    state = {
+      ...state,
+      players: state.players.map((p) => (p.id === 'p1' ? { ...p, cash: 600 } : p)),
+    };
+    const offer = decideBot(state, 'p1', 'hard');
+    expect(offer).toMatchObject({
+      type: 'PROPOSE_TRADE',
+      to: 'p2',
+      receive: { tiles: ['moewenkai'] },
+      terms: [{ kind: 'installments', payer: 'p1' }],
+    });
+    expect(apply(state, offer!).ok).toBe(true);
+  });
+
+  it('bewertet Vereinbarungen: lohnende Raten ja, Mietfreiheit verschenken nein', () => {
+    const base = withTiles(newGame(['hard', 'hard'], 1), { busbahnhof: 'p2', kristallhoehe: 'p2' });
+    const good = apply(base, {
+      type: 'PROPOSE_TRADE',
+      playerId: 'p1',
+      to: 'p2',
+      give: { cash: 50, tiles: [], jailFreeCards: 0 },
+      receive: { cash: 0, tiles: ['busbahnhof'], jailFreeCards: 0 },
+      terms: [{ kind: 'installments', payer: 'p1', amount: 60, rounds: 5 }],
+    }).state;
+    expect(decideBot(good, 'p2', 'hard')).toMatchObject({ type: 'ACCEPT_TRADE' });
+
+    const bad = apply(base, {
+      type: 'PROPOSE_TRADE',
+      playerId: 'p1',
+      to: 'p2',
+      give: { cash: 10, tiles: [], jailFreeCards: 0 },
+      receive: { cash: 0, tiles: [], jailFreeCards: 0 },
+      terms: [
+        { kind: 'rentFree', owner: 'p2', tiles: ['busbahnhof', 'kristallhoehe'], rounds: 20 },
+      ],
+    }).state;
+    expect(decideBot(bad, 'p2', 'hard')).toMatchObject({ type: 'REJECT_TRADE' });
+    expect(decideBot(bad, 'p2', 'medium')).toMatchObject({ type: 'REJECT_TRADE' });
   });
 });

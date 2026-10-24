@@ -9,6 +9,7 @@ import {
   type PlayerId,
 } from '@menelgame/engine';
 import { isOwnable, type PropertyTile } from '@menelgame/schema';
+import { uniformOdds } from './landing';
 import { all, find, type Strategy } from './strategy';
 import {
   bundleWorth,
@@ -17,16 +18,17 @@ import {
   completesForOpponent,
   completesGroup,
   groupPrice,
+  termsWorth,
   tileWorth,
 } from './valuation';
 
 /** Wie viele Grundstücke noch frei sind – früh im Spiel lohnt es sich, unterwegs zu sein. */
-function unownedCount(view: GameState): number {
+export function unownedCount(view: GameState): number {
   return Object.values(view.tiles).filter((t) => t.owner === null).length;
 }
 
 /** Bekäme ein Gegner durch diesen Tausch eine neue komplette Gruppe? */
-function opponentMonopolyPenalty(
+export function opponentMonopolyPenalty(
   view: GameState,
   me: PlayerId,
   tiles: string[],
@@ -42,7 +44,7 @@ function opponentMonopolyPenalty(
 }
 
 /** Ertrag pro investiertem Taler beim nächsten Haus. */
-function buildYield(view: GameState, tile: PropertyTile): number {
+export function buildYield(view: GameState, tile: PropertyTile): number {
   const level = view.tiles[tile.id]?.buildings ?? 0;
   const gain =
     (tile.rent[level + 1] ?? 0) - (level === 0 ? tile.rent[0]! * 2 : (tile.rent[level] ?? 0));
@@ -59,8 +61,9 @@ export const medium: Strategy = {
     const gain = bundleWorth(view, offer.give, me, true);
     const loss = bundleWorth(view, offer.receive, me, false);
     const penalty = opponentMonopolyPenalty(view, me, offer.receive.tiles, offer.from);
+    const terms = termsWorth(view, offer.terms, me, uniformOdds(view));
     const keepsReserve = cashOf(view, me) - offer.receive.cash >= cashReserve(view, me) * 0.5;
-    return gain - loss - penalty >= 0 && keepsReserve
+    return gain - loss - penalty + terms >= 0 && keepsReserve
       ? { type: 'ACCEPT_TRADE', playerId: me, tradeId: offer.id }
       : { type: 'REJECT_TRADE', playerId: me, tradeId: offer.id };
   },

@@ -19,7 +19,7 @@ export const PLAYER_COLORS = [
   '#6e6e6e',
 ] as const;
 
-export const BotLevelSchema = z.enum(['easy', 'medium']);
+export const BotLevelSchema = z.enum(['easy', 'medium', 'hard']);
 export type BotLevel = z.infer<typeof BotLevelSchema>;
 
 export const BOT_NAMES = [
@@ -50,6 +50,32 @@ export const TradeBundleSchema = z.object({
   jailFreeCards: z.int().min(0).max(20),
 });
 
+const Rounds = z.int().min(1).max(20);
+
+/** Vereinbarungen mit Laufzeit im Handel; die Engine prüft Besitz und Beteiligte. */
+export const AgreementTermSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('rentFree'),
+    owner: Id,
+    tiles: z.array(Id).min(1).max(12),
+    rounds: Rounds,
+  }),
+  z.object({
+    kind: z.literal('installments'),
+    payer: Id,
+    amount: z.int().min(1).max(5000),
+    rounds: Rounds,
+  }),
+  z.object({
+    kind: z.literal('profitShare'),
+    owner: Id,
+    tiles: z.array(Id).min(1).max(12),
+    percent: z.int().min(1).max(100),
+    rounds: Rounds,
+  }),
+]);
+const Terms = z.array(AgreementTermSchema).max(3).default([]);
+
 const plain = <T extends string>(type: T) => z.object({ type: z.literal(type) });
 const onTile = <T extends string>(type: T) => z.object({ type: z.literal(type), tileId: Id });
 const onTrade = <T extends string>(type: T) => z.object({ type: z.literal(type), tradeId: Id });
@@ -75,12 +101,14 @@ export const ActionInputSchema = z.discriminatedUnion('type', [
     to: Id,
     give: TradeBundleSchema,
     receive: TradeBundleSchema,
+    terms: Terms,
   }),
   z.object({
     type: z.literal('COUNTER_TRADE'),
     tradeId: Id,
     give: TradeBundleSchema,
     receive: TradeBundleSchema,
+    terms: Terms,
   }),
   onTrade('ACCEPT_TRADE'),
   onTrade('REJECT_TRADE'),
