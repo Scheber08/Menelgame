@@ -1611,3 +1611,36 @@ fieldset.rules-grid {
   height: 2.2rem;
   padding: 0.1rem;
 }
+
+.settings-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-bottom: -0.25rem;
+}
+
+/* Figuren hüpfen beim Laufen von Feld zu Feld. */
+.token {
+  animation: token-hop 160ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes token-hop {
+  from {
+    transform: translateY(-5px) scale(1.12);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .token {
+    animation: none;
+  }
+}
+
+.replay-panel input[type='range'] {
+  width: 100%;
+}

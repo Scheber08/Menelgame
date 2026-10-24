@@ -757,5 +757,25 @@
     "chance": "Zufall",
     "ownsGroup": "Besitzt Gruppe",
     "variable": "Variable"
+  },
+  "settings": {
+    "sound": "Ton",
+    "animations": "Animationen"
+  },
+  "replay": {
+    "open": "Replay ansehen",
+    "heading": "Replay",
+    "close": "Zurück zum Spiel",
+    "position": "Aktion {{step}} von {{total}} · Runde {{round}}",
+    "slider": "Position im Spiel",
+    "start": "Zum Anfang",
+    "prevTurn": "Vorheriger Zug",
+    "back": "Eine Aktion zurück",
+    "play": "Abspielen",
+    "pause": "Pause",
+    "forward": "Eine Aktion weiter",
+    "nextTurn": "Nächster Zug",
+    "end": "Zum Ende",
+    "speed": "Tempo"
   }
 }

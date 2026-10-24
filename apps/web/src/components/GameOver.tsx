@@ -7,9 +7,10 @@ interface GameOverProps {
   events: GameEvent[];
   onClose: () => void;
   onNewGame: () => void;
+  onReplay?: () => void;
 }
 
-export function GameOver({ state, events, onClose, onNewGame }: GameOverProps) {
+export function GameOver({ state, events, onClose, onNewGame, onReplay }: GameOverProps) {
   const { t } = useTranslation();
   const end = [...events].reverse().find((e) => e.type === 'gameOver');
   if (end?.type !== 'gameOver') return null;
@@ -44,6 +45,11 @@ export function GameOver({ state, events, onClose, onNewGame }: GameOverProps) {
           <button type="button" className="primary" onClick={onNewGame}>
             {t('app.newGame')}
           </button>
+          {onReplay && (
+            <button type="button" onClick={onReplay}>
+              {t('replay.open')}
+            </button>
+          )}
           <button type="button" onClick={onClose}>
             {t('gameOver.close')}
           </button>

@@ -42,9 +42,11 @@ interface BoardProps {
   events: GameEvent[];
   selectedTileId: string | null;
   onSelectTile: (tileId: string) => void;
+  /** Angezeigte Figurenpositionen (Animation); ohne Angabe die aus dem Zustand. */
+  positions?: Record<string, number>;
 }
 
-export function Board({ state, events, selectedTileId, onSelectTile }: BoardProps) {
+export function Board({ state, events, selectedTileId, onSelectTile, positions }: BoardProps) {
   const pack = state.pack;
   const geometry = useMemo(() => boardGeometry(pack.layout, pack.tiles.length), [pack]);
   const colors = useMemo(
@@ -57,7 +59,7 @@ export function Board({ state, events, selectedTileId, onSelectTile }: BoardProp
   );
 
   const playersAt = (index: number) =>
-    state.players.filter((p) => !p.bankrupt && p.position === index);
+    state.players.filter((p) => !p.bankrupt && (positions?.[p.id] ?? p.position) === index);
   const current = state.players[state.currentPlayer];
   const labels = useMemo(() => tokenLabels(state.players), [state.players]);
   const theme = pack.theme;
