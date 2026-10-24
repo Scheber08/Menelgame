@@ -77,6 +77,16 @@ function ConnectedRoom({ code }: { code: string }) {
   const deadline = room.deadline ? room.deadline.at - online.clockOffset : null;
   const isHost = seatId !== null && seatId === room.hostSeatId;
   const connected = Object.fromEntries(room.seats.map((s) => [s.id, s.connected]));
+  const badges = Object.fromEntries(
+    room.seats.map((s) => [
+      s.id,
+      s.bot
+        ? [t('room.botBadge', { level: t(`room.bot_${s.bot}`) })]
+        : s.standIn
+          ? [t('room.standIn')]
+          : [],
+    ]),
+  );
 
   return (
     <GameScreen
@@ -89,6 +99,7 @@ function ConnectedRoom({ code }: { code: string }) {
       turnDeadline={room.deadline?.kind === 'turn' ? deadline : null}
       auctionDeadline={room.deadline?.kind === 'auction' ? deadline : null}
       connected={connected}
+      badges={badges}
       exportHref={`/api/rooms/${code}/log`}
       onNewGame={() => navigate('/')}
       sidebarTop={
@@ -173,6 +184,11 @@ function Lobby({ online, room }: { online: OnlineRoom; room: RoomView }) {
               <span className="player-name">{s.name}</span>
               {s.id === room.hostSeatId && <span className="badge">{t('room.host')}</span>}
               {s.id === seatId && <span className="badge">{t('players.you')}</span>}
+              {s.bot && (
+                <span className="badge bot">
+                  {t('room.botBadge', { level: t(`room.bot_${s.bot}`) })}
+                </span>
+              )}
               {!s.connected && <span className="badge offline">{t('players.offline')}</span>}
               {isHost && s.id !== seatId && (
                 <button
@@ -186,6 +202,20 @@ function Lobby({ online, room }: { online: OnlineRoom; room: RoomView }) {
             </li>
           ))}
         </ul>
+        {isHost && room.seats.length < maxPlayers && (
+          <div className="action-buttons add-bots">
+            {(['easy', 'medium'] as const).map((level) => (
+              <button key={level} type="button" onClick={() => send({ t: 'addBot', level })}>
+                {t('room.addBot', { level: t(`room.bot_${level}`) })}
+              </button>
+            ))}
+          </div>
+        )}
+        <TakeoverSetting
+          room={room}
+          disabled={!isHost}
+          onChange={(s) => send({ t: 'roomSettings', botTakeoverSeconds: s })}
+        />
         {!me && room.seats.length < maxPlayers && (
           <JoinForm room={room} onJoin={(name, color) => send({ t: 'join', name, color })} />
         )}
@@ -240,6 +270,37 @@ function Lobby({ online, room }: { online: OnlineRoom; room: RoomView }) {
         <p className="muted center">{t('room.waitingForHost')}</p>
       )}
     </main>
+  );
+}
+
+const TAKEOVER_OPTIONS = [30, 60, 120, 300];
+
+function TakeoverSetting({
+  room,
+  disabled,
+  onChange,
+}: {
+  room: RoomView;
+  disabled: boolean;
+  onChange: (seconds: number | null) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <label className="takeover">
+      {t('room.takeover')}
+      <select
+        value={room.botTakeoverSeconds ?? ''}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+      >
+        <option value="">{t('room.never')}</option>
+        {TAKEOVER_OPTIONS.map((s) => (
+          <option key={s} value={s}>
+            {t('setup.seconds', { count: s })}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -313,6 +374,11 @@ function HostPanel({
           {room.paused ? t('host.resume') : t('host.pause')}
         </button>
       </div>
+      <TakeoverSetting
+        room={room}
+        disabled={false}
+        onChange={(s) => send({ t: 'roomSettings', botTakeoverSeconds: s })}
+      />
       <h3>{t('host.players')}</h3>
       <ul className="seat-list">
         {state.players

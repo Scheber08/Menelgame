@@ -1,15 +1,7 @@
+import { PLAYER_COLORS } from '@menelgame/protocol';
 import { useTranslation } from 'react-i18next';
 
-export const PLAYER_COLORS = [
-  '#e5484d',
-  '#3e63dd',
-  '#30a46c',
-  '#f5a524',
-  '#8e4ec6',
-  '#12a594',
-  '#d6409f',
-  '#6e6e6e',
-];
+export { PLAYER_COLORS };
 
 interface ColorPickerProps {
   value: string;

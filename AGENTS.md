@@ -9,6 +9,7 @@ Kontext für alle Agenten-Sitzungen an Menelgame. Erst lesen, dann arbeiten. Das
 - `packages/engine`: reine, deterministische Spiellogik ohne DOM- oder Netzwerkzugriff
 - `packages/packs`: mitgelieferte Board Packs (JSON) inkl. Validierung
 - `packages/protocol`: Nachrichten zwischen Browser und Spielraum (Zod-geprüft)
+- `packages/bots`: Bots (Stufen Leicht und Mittel), reine Funktionen über der Engine
 - `apps/web`: React + Vite, i18next für alle Texte
 - `apps/server`: Cloudflare Worker + ein Durable Object pro Spielraum (Wrangler)
 - Vitest, ESLint (Flat Config), Prettier
@@ -54,11 +55,16 @@ apps/
   server/
     src/index.ts      Worker: /api/rooms, /api/rooms/<code>[/log], /r/<code>/ws, Assets
     src/gameRoom.ts   Durable Object: WebSocket-Hibernation, Speicher, Alarm
-    src/room.ts       Raum-Logik ohne Cloudflare-APIs (Lobby, Host, Uhren) + Tests
+    src/room.ts       Raum-Logik ohne Cloudflare-APIs (Lobby, Host, Bots, Uhren) + Tests
     wrangler.jsonc
 packages/
   schema/src/         Zod-Schemas: pack.ts, rules.ts, tiles.ts, effects.ts
-  protocol/src/       ClientMessage, ServerMessage, RoomView, ActionInput
+  protocol/src/       ClientMessage, ServerMessage, RoomView, ActionInput, Bot-Namen, Farben
+  bots/src/
+    index.ts          decideBot(state, playerId, level, memory)
+    view.ts           botView (ohne Würfel-Zukunft und Kartenreihenfolge), Gedächtnis
+    valuation.ts      Feldwerte, Reserve, Tauschbewertung
+    easy.ts, medium.ts  Stufen
   engine/src/
     apply.ts          apply, getLegalActions, getDefaultAction
     actions.ts        Validierung + Ausführung pro Aktionstyp
@@ -95,12 +101,21 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 - Der Raum ist autoritativ. Clients schicken nur Wünsche (`ClientMessage`); der Spieler einer Aktion kommt immer aus der Verbindung, nie aus der Nachricht.
 - `Room` (room.ts) ist frei von Cloudflare-APIs und wird mit einer Attrappe getestet; `GameRoom` ist nur Adapter.
 - Identität ohne Account: geheimes Token pro Platz, im Browser unter `menelgame.room.<CODE>`.
+- Bots sind normale Aktionsquellen: `decideBot` liefert eine Spieleraktion, der Raum wendet sie wie die eines Menschen an. Ein Bot-Zug pro Alarm, mit `BOT_DELAY_MS` Abstand, damit Menschen mitlesen können.
+- Ein einziger Alarm pro Raum: frühester Zeitpunkt aus Bot-Zug, Zug-/Auktionsuhr und Beginn einer Vertretung.
+
+## Architekturregeln für Bots
+
+- Bots sehen nur, was Menschen sehen (`botView`): kein Zufallszustand, keine Kartenreihenfolge. Ein Test prüft, dass Entscheidungen davon unabhängig sind.
+- Bots sind deterministisch (Pseudozufall aus Spielstand und Spieler) und liefern nur gültige Aktionen; ist eine Idee ungültig, fällt der Bot auf eine sichere Aktion zurück.
+- Die Bewertung ist bewusst einfach und billig (keine Simulationen) wegen des CPU-Limits im Worker. Stufe Schwer mit Simulationen kommt in Phase 6.
 
 ## Stand
 
 - **Phase 1 abgeschlossen:** Schema, Engine, Standard-Pack, Hot-Seat, Tests inkl. kompletter Spiele mit Replay.
 - **Phase 2 umgesetzt:** Worker + Durable Object, Lobby mit Raumcode und Einladungslink, Reconnect, Auktionen, einfacher Handel, Host-Rechte (entfernen, pausieren, Regeln live), Zugtimer. Lokal mit mehreren Clients getestet; das Deployment braucht ein Cloudflare-Konto.
-- Nächste Phase: Bots (Phase 3), siehe docs/KONZEPT.md.
+- **Phase 3 umgesetzt:** Bots Leicht und Mittel, Bot-Plätze in der Lobby, Vertretung abwesender Spieler nach einstellbarer Zeit, Ausführung per Alarm. Spiele nur mit Bots laufen ohne Hänger bis zum Ende (Tests, Stresstest über 200 Seeds).
+- Nächste Phase: Anpassung I (Phase 4), siehe docs/KONZEPT.md.
 
 ## Arbeitsweise
 

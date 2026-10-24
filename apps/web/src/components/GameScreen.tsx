@@ -29,6 +29,8 @@ export interface GameScreenProps {
   auctionDeadline?: number | null;
   onAuctionClose?: () => void;
   connected?: Record<string, boolean>;
+  /** Zusätzliche Kennzeichen je Spieler, z. B. „Bot“. */
+  badges?: Record<string, string[]>;
   /** Für Replay-Prüfung und Export (Hot-Seat). */
   log?: GameLog;
   exportHref?: string;
@@ -105,6 +107,7 @@ export function GameScreen(props: GameScreenProps) {
           state={state}
           me={mode === 'online' ? me : null}
           connected={props.connected ?? null}
+          badges={props.badges ?? null}
           selectedTileId={selectedTileId}
           onSelectTile={setSelectedTileId}
         />

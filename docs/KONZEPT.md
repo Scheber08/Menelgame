@@ -38,9 +38,10 @@ Eigene Feldtypen und Karten beschreiben ihre Logik **deklarativ** als Auslöser 
 5. **Anpassung II** – Brett-Editor, Effekt-Baukasten, Testmodus, Zufallsbrett-Generator.
 6. **Feinschliff** – erweiterter Handel (Mietfreiheit, Ratenzahlung, Gewinnbeteiligung), Bot Schwer, Animationen, Sound, Replay-Ansicht, Statistiken, Variablen, weitere Packs.
 
-Stand: Phase 1 und 2 sind umgesetzt. Für die nächsten Phasen gibt es diese Anknüpfungspunkte:
+Stand: Phase 1 bis 3 sind umgesetzt. Für die nächsten Phasen gibt es diese Anknüpfungspunkte:
 
-- **Bots (Phase 3):** Bots schicken dieselben Aktionen wie Menschen; `getLegalActions(state, playerId)` liefert alle erlaubten Aktionen, `getDefaultAction` eine sichere Rückfallaktion. Im Durable Object läuft bereits ein Alarm für Uhren.
+- **Bot Schwer (Phase 6):** `@menelgame/bots` hat eine Strategie-Schnittstelle; eine weitere Stufe kann Landewahrscheinlichkeiten per Engine simulieren.
+- **Testmodus gegen Bots (Phase 5):** Die Bots sind reine Funktionen und laufen auch im Browser.
 - **Packs in D1 (Phase 4):** Der Spielraum speichert das Pack als Schnappschuss im Spielzustand.
 - **Eigene Feldtypen (Phase 5):** Feldtyp-Registry mit `onLand`/`onPass`, die nur deklarative Effekte liefert.
 - **Vereinbarungen mit Laufzeit (Phase 6):** `state.agreements` und `TradeOffer` sind dafür vorgesehen.

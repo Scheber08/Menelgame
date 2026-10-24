@@ -2,7 +2,7 @@
 
 Ein vollständig anpassbares Grundstücks-Handelsspiel für private Runden mit Freunden. Alles, was ein Spiel ausmacht – Brett, Felder, Karten, Regeln –, steckt in einem JSON-„Board Pack“.
 
-**Stand: Phase 2.** Online-Räume mit Einladungslink, Auktionen, Handel und Host-Rechten laufen auf einem Cloudflare Worker mit Durable Objects. Lokal geht es auch als Hot-Seat an einem Gerät.
+**Stand: Phase 3.** Online-Räume mit Einladungslink, Auktionen, Handel, Host-Rechten und Bots (Leicht, Mittel) laufen auf einem Cloudflare Worker mit Durable Objects. Bots füllen freie Plätze und vertreten abwesende Spieler. Lokal geht es auch als Hot-Seat an einem Gerät.
 
 ## Schnellstart
 

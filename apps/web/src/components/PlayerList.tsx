@@ -8,6 +8,7 @@ interface PlayerListProps {
   me?: string | null;
   /** Online: wer gerade verbunden ist. */
   connected?: Record<string, boolean> | null;
+  badges?: Record<string, string[]> | null;
   selectedTileId: string | null;
   onSelectTile: (tileId: string) => void;
 }
@@ -16,6 +17,7 @@ export function PlayerList({
   state,
   me = null,
   connected = null,
+  badges = null,
   selectedTileId,
   onSelectTile,
 }: PlayerListProps) {
@@ -38,6 +40,12 @@ export function PlayerList({
                 <span className="dot" style={{ background: p.color }} />
                 <span className="player-name">{p.name}</span>
                 {p.id === me && <span className="badge">{t('players.you')}</span>}
+                {!p.bankrupt &&
+                  badges?.[p.id]?.map((b) => (
+                    <span key={b} className="badge bot">
+                      {b}
+                    </span>
+                  ))}
                 {connected && !p.bankrupt && connected[p.id] === false && (
                   <span className="badge offline">{t('players.offline')}</span>
                 )}

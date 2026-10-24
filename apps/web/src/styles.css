@@ -1140,3 +1140,21 @@ fieldset.rules-grid {
   max-height: 180px;
   overflow-y: auto;
 }
+
+.badge.bot {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.add-bots {
+  margin: 0 0 0.75rem;
+}
+
+.takeover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}

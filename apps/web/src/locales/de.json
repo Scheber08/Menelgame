@@ -346,7 +346,14 @@
     "takeSeat": "Platz nehmen",
     "needTwo": "Mindestens zwei Spieler nötig",
     "start": "Spiel starten",
-    "waitingForHost": "Warte, bis der Host das Spiel startet …"
+    "waitingForHost": "Warte, bis der Host das Spiel startet …",
+    "addBot": "Bot hinzufügen ({{level}})",
+    "bot_easy": "leicht",
+    "bot_medium": "mittel",
+    "botBadge": "Bot · {{level}}",
+    "standIn": "Bot vertritt",
+    "takeover": "Bot übernimmt abwesende Spieler nach",
+    "never": "nie"
   },
   "roomErrors": {
     "badMessage": "Ungültige Nachricht.",
