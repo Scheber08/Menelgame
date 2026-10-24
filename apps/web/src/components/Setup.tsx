@@ -1,10 +1,11 @@
 import type { GameSetup } from '@menelgame/engine';
 import { builtInPacks } from '@menelgame/packs';
-import type { Rules } from '@menelgame/schema';
+import type { BoardPack, DiceConfig, Rules } from '@menelgame/schema';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ColorPicker, firstFreeColor, PLAYER_COLORS } from './ColorPicker';
-import { PackSelect } from './PackSelect';
+import { PackChooser } from './PackChooser';
+import { RuleSetPicker } from './RuleSetPicker';
 import { RulesForm } from './RulesForm';
 
 /** Hot-Seat: bis zu vier Spieler an einem Gerät. */
@@ -21,16 +22,23 @@ interface SeatDraft {
 
 export function Setup({ onStart }: { onStart: (setup: GameSetup) => void }) {
   const { t } = useTranslation();
-  const [packId, setPackId] = useState(builtInPacks[0]!.meta.id);
-  const pack = builtInPacks.find((p) => p.meta.id === packId) ?? builtInPacks[0]!;
+  const [pack, setPack] = useState<BoardPack>(builtInPacks[0]!);
   const maxSeats = Math.min(HOT_SEAT_MAX, pack.maxPlayers);
 
   const [seats, setSeats] = useState<SeatDraft[]>(() =>
     [1, 2].map((n) => ({ name: t('setup.defaultName', { n }), color: PLAYER_COLORS[n - 1]! })),
   );
   const [rules, setRules] = useState<Rules>(() => structuredClone(pack.rules));
+  const [dice, setDice] = useState<DiceConfig>(() => structuredClone(pack.dice));
   const [seed, setSeed] = useState(() => String(randomSeed()));
   const [error, setError] = useState<string | null>(null);
+
+  const choose = (next: BoardPack) => {
+    setPack(next);
+    setRules(structuredClone(next.rules));
+    setDice(structuredClone(next.dice));
+    setSeats((list) => list.slice(0, Math.min(HOT_SEAT_MAX, next.maxPlayers)));
+  };
 
   const updateSeat = (i: number, patch: Partial<SeatDraft>) =>
     setSeats((list) => list.map((s, j) => (j === i ? { ...s, ...patch } : s)));
@@ -54,6 +62,7 @@ export function Setup({ onStart }: { onStart: (setup: GameSetup) => void }) {
     onStart({
       pack,
       rules,
+      dice,
       seed: Number.isFinite(parsedSeed) ? parsedSeed >>> 0 : randomSeed(),
       players: seats.map((s, i) => ({ id: `p${i + 1}`, name: s.name.trim(), color: s.color })),
     });
@@ -65,13 +74,11 @@ export function Setup({ onStart }: { onStart: (setup: GameSetup) => void }) {
 
       <fieldset className="panel">
         <legend>{t('setup.pack')}</legend>
-        <PackSelect
-          value={packId}
-          onChange={(next) => {
-            setPackId(next.meta.id);
-            setRules(structuredClone(next.rules));
-          }}
-        />
+        <p>
+          <strong>{pack.meta.name}</strong>
+        </p>
+        {pack.meta.description && <p className="muted small">{pack.meta.description}</p>}
+        <PackChooser onBuiltIn={(next) => choose(next)} onCustom={(next) => choose(next)} />
       </fieldset>
 
       <fieldset className="panel">
@@ -110,7 +117,15 @@ export function Setup({ onStart }: { onStart: (setup: GameSetup) => void }) {
 
       <details className="panel">
         <summary>{t('setup.rules')}</summary>
-        <RulesForm rules={rules} onChange={setRules} />
+        <RuleSetPicker
+          rules={rules}
+          dice={dice}
+          onLoad={(r, d) => {
+            setRules(r);
+            setDice(d);
+          }}
+        />
+        <RulesForm rules={rules} onChange={setRules} dice={dice} onDiceChange={setDice} />
         <label className="seed">
           {t('setup.seed')}
           <input

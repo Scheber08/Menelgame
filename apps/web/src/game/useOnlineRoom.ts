@@ -2,6 +2,7 @@ import { isPlayerAction, type Action, type GameEvent, type GameState } from '@me
 import {
   roomSocketPath,
   type ActionInput,
+  type LobbyCard,
   type ClientMessage,
   type RoomView,
   type ServerMessage,
@@ -39,6 +40,8 @@ export interface OnlineRoom {
   seatId: string | null;
   game: { state: GameState; events: GameEvent[] } | null;
   error: UiError | null;
+  /** Eigene geheime Lobby-Karten, wie der Server sie gespeichert hat. */
+  myLobbyCards: LobbyCard[];
   /** Serverzeit minus lokale Zeit in ms. */
   clockOffset: number;
   send: (message: ClientMessage) => void;
@@ -57,6 +60,7 @@ export function useOnlineRoom(code: string): OnlineRoom {
   const [seatId, setSeatId] = useState<string | null>(null);
   const [game, setGame] = useState<OnlineRoom['game']>(null);
   const [error, setError] = useState<UiError | null>(null);
+  const [myLobbyCards, setMyLobbyCards] = useState<LobbyCard[]>([]);
   const [clockOffset, setClockOffset] = useState(0);
   const socket = useRef<WebSocket | null>(null);
 
@@ -96,6 +100,10 @@ export function useOnlineRoom(code: string): OnlineRoom {
             code: message.engineCode ?? message.code,
             ...(message.message !== undefined && { message: message.message }),
           });
+          return;
+        case 'myLobbyCards':
+          setMyLobbyCards(message.cards);
+          setError(null);
           return;
         case 'pong':
           return;
@@ -158,6 +166,7 @@ export function useOnlineRoom(code: string): OnlineRoom {
     seatId,
     game,
     error,
+    myLobbyCards,
     clockOffset,
     send,
     act,

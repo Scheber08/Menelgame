@@ -1,4 +1,5 @@
 import { replay, type GameLog, type GameEvent, type GameState } from '@menelgame/engine';
+import { publicGameState } from '@menelgame/protocol';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatEvent } from '../game/format';
@@ -32,7 +33,9 @@ export function EventLog({ state, events, log, exportHref }: EventLogProps) {
     try {
       const source = log ?? ((await fetch(exportHref!).then((r) => r.json())) as GameLog);
       const result = replay(source);
-      const same = JSON.stringify(result.state) === JSON.stringify(state);
+      // Online kennt der Browser nur den verdeckten Zustand.
+      const replayed = log ? result.state : publicGameState(result.state);
+      const same = JSON.stringify(replayed) === JSON.stringify(state);
       setVerdict(
         same
           ? { ok: true, text: t('log.verifyOk', { count: source.actions.length }) }

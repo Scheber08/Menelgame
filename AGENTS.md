@@ -11,7 +11,7 @@ Kontext für alle Agenten-Sitzungen an Menelgame. Erst lesen, dann arbeiten. Das
 - `packages/protocol`: Nachrichten zwischen Browser und Spielraum (Zod-geprüft)
 - `packages/bots`: Bots (Stufen Leicht und Mittel), reine Funktionen über der Engine
 - `apps/web`: React + Vite, i18next für alle Texte
-- `apps/server`: Cloudflare Worker + ein Durable Object pro Spielraum (Wrangler)
+- `apps/server`: Cloudflare Worker + ein Durable Object pro Spielraum (Wrangler), D1 für Profile, Packs und Regelsets
 - Vitest, ESLint (Flat Config), Prettier
 
 Die Pakete werden als TypeScript-Quellcode konsumiert (`exports` zeigt auf `src/index.ts`). Vite, Vitest und Wrangler bündeln selbst; `build` in den Paketen ist daher eine reine Typprüfung.
@@ -36,9 +36,10 @@ Im Dev-Modus leitet Vite `/api/*` und `/r/<code>/ws` an `wrangler dev` weiter. O
 
 1. Kostenloses Cloudflare-Konto anlegen.
 2. Einmalig anmelden: `pnpm --filter @menelgame/server exec wrangler login`
-3. Hochladen: `pnpm deploy`. Wrangler legt den Worker `menelgame` an, lädt `apps/web/dist` als statische Assets hoch und führt die Durable-Object-Migration `v1` (SQLite) aus.
-4. Die App ist dann unter `https://menelgame.<dein-subdomain>.workers.dev` erreichbar. Einladungslinks haben die Form `/r/<CODE>`.
-5. Logs live ansehen: `pnpm --filter @menelgame/server exec wrangler tail`.
+3. D1-Datenbank einmalig anlegen: `pnpm --filter @menelgame/server exec wrangler d1 create menelgame` und die ausgegebene `database_id` in `apps/server/wrangler.jsonc` eintragen.
+4. Hochladen: `pnpm deploy`. Das wendet die D1-Migrationen (`apps/server/migrations`) remote an, legt den Worker `menelgame` an, lädt `apps/web/dist` als statische Assets hoch und führt die Durable-Object-Migration `v1` (SQLite) aus.
+5. Die App ist dann unter `https://menelgame.<dein-subdomain>.workers.dev` erreichbar. Einladungslinks haben die Form `/r/<CODE>`.
+6. Logs live ansehen: `pnpm --filter @menelgame/server exec wrangler tail`.
 
 Konfiguration: [apps/server/wrangler.jsonc](apps/server/wrangler.jsonc). Der Free Plan erlaubt nur SQLite-gestützte Durable Objects (`new_sqlite_classes`); Tageslimits (Requests, geschriebene Zeilen) stehen in der Cloudflare-Doku. Pro Spielaktion schreibt ein Raum etwa vier Zeilen.
 
@@ -50,10 +51,12 @@ apps/
     board/            Brett-Geometrie und SVG-Rendering
     components/       UI-Bausteine (GameScreen, ActionBar, AuctionPanel, TradePanel, …)
     game/             Hooks: useHotSeatGame, useOnlineRoom; Formatierung
-    pages/            Home, HotSeatPage, RoomPage (Lobby, Spiel, Host-Panel)
+    pages/            Home, HotSeatPage, RoomPage, Lobby, MyPacksPage, PackEditorPage, SharedPackPage
     locales/          Sprachdateien (de.json)
   server/
     src/index.ts      Worker: /api/rooms, /api/rooms/<code>[/log], /r/<code>/ws, Assets
+    src/api.ts        /api/profile, /api/packs, /api/rulesets (D1) + Tests mit node:sqlite
+    migrations/       D1-Schema
     src/gameRoom.ts   Durable Object: WebSocket-Hibernation, Speicher, Alarm
     src/room.ts       Raum-Logik ohne Cloudflare-APIs (Lobby, Host, Bots, Uhren) + Tests
     wrangler.jsonc
@@ -101,6 +104,8 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 - Der Raum ist autoritativ. Clients schicken nur Wünsche (`ClientMessage`); der Spieler einer Aktion kommt immer aus der Verbindung, nie aus der Nachricht.
 - `Room` (room.ts) ist frei von Cloudflare-APIs und wird mit einer Attrappe getestet; `GameRoom` ist nur Adapter.
 - Identität ohne Account: geheimes Token pro Platz, im Browser unter `menelgame.room.<CODE>`.
+- Profile ohne Account: zufällige ID + Geheimnis (`Authorization: Bearer <id>:<geheimnis>`), in D1 nur als SHA-256-Hash. Packs sind privat; es gibt keinen Endpunkt, der fremde Packs listet.
+- Clients bekommen nur `publicGameState`: ohne Zufallszustand, ohne Kartenreihenfolge, ohne Text geheimer Lobby-Karten. Das vollständige Log gibt es erst nach Spielende.
 - Bots sind normale Aktionsquellen: `decideBot` liefert eine Spieleraktion, der Raum wendet sie wie die eines Menschen an. Ein Bot-Zug pro Alarm, mit `BOT_DELAY_MS` Abstand, damit Menschen mitlesen können.
 - Ein einziger Alarm pro Raum: frühester Zeitpunkt aus Bot-Zug, Zug-/Auktionsuhr und Beginn einer Vertretung.
 
@@ -115,7 +120,8 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 - **Phase 1 abgeschlossen:** Schema, Engine, Standard-Pack, Hot-Seat, Tests inkl. kompletter Spiele mit Replay.
 - **Phase 2 umgesetzt:** Worker + Durable Object, Lobby mit Raumcode und Einladungslink, Reconnect, Auktionen, einfacher Handel, Host-Rechte (entfernen, pausieren, Regeln live), Zugtimer. Lokal mit mehreren Clients getestet; das Deployment braucht ein Cloudflare-Konto.
 - **Phase 3 umgesetzt:** Bots Leicht und Mittel, Bot-Plätze in der Lobby, Vertretung abwesender Spieler nach einstellbarer Zeit, Ausführung per Alarm. Spiele nur mit Bots laufen ohne Hänger bis zum Ende (Tests, Stresstest über 200 Seeds).
-- Nächste Phase: Anpassung I (Phase 4), siehe docs/KONZEPT.md.
+- **Phase 4 umgesetzt:** Profile mit Wiederherstellungscode, eigene Packs und Regelsets in D1, Teilen-Links (widerrufbar), Inhalts-Editor mit Import/Export, Regel-Panel, eigene Packs in Lobby und Hot-Seat, geheime Lobby-Karten.
+- Nächste Phase: Anpassung II (Phase 5), siehe docs/KONZEPT.md.
 
 ## Arbeitsweise
 
