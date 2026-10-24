@@ -55,6 +55,7 @@ describe('Handel', () => {
         to: 'p2',
         give: bundle({ cash: 150, tiles: ['schilfweg'] }),
         receive: bundle({ tiles: ['weidenufer'] }),
+        terms: [],
         counterTo: null,
       },
     ]);
@@ -139,6 +140,7 @@ describe('Handel', () => {
         to: 'p1',
         give: bundle({ tiles: ['busbahnhof'] }),
         receive: bundle({ cash: 180 }),
+        terms: [],
         counterTo: 't1',
       },
     ]);

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ColorSchema, IdSchema } from './common';
-import { CustomTileTypeSchema, type Condition } from './customTypes';
+import { CustomTileTypeSchema, VariableSchema, type Condition } from './customTypes';
 import { EffectSchema, type Effect } from './effects';
 import { DiceSchema, RulesSchema } from './rules';
 import { BUILT_IN_TILE_TYPES, ImageUrlSchema, TileSchema } from './tiles';
@@ -79,6 +79,7 @@ export const BoardPackSchema = z
     theme: ThemeSchema.prefault({}),
     groups: z.array(GroupSchema).max(40),
     tileTypes: z.array(CustomTileTypeSchema).max(20).default([]),
+    variables: z.array(VariableSchema).max(10).default([]),
     tiles: z.array(TileSchema).min(8).max(100),
     decks: z.array(DeckSchema).max(10),
   })
@@ -93,6 +94,8 @@ export const BoardPackSchema = z
     for (const id of dupes(pack.decks.map((d) => d.id))) issue(`Doppelte Deck-ID ${id}`, ['decks']);
     for (const id of dupes(pack.tileTypes.map((t) => t.id)))
       issue(`Doppelte Feldtyp-ID ${id}`, ['tileTypes']);
+    for (const id of dupes(pack.variables.map((v) => v.id)))
+      issue(`Doppelte Variablen-ID ${id}`, ['variables']);
     pack.decks.forEach((deck, d) => {
       for (const id of dupes(deck.cards.map((c) => c.id)))
         issue(`Doppelte Karten-ID ${id}`, ['decks', d, 'cards']);
@@ -106,6 +109,7 @@ export const BoardPackSchema = z
     const deckIds = new Set(pack.decks.map((d) => d.id));
     const tileIds = new Set(pack.tiles.map((t) => t.id));
     const typeIds = new Set(pack.tileTypes.map((t) => t.id));
+    const variableIds = new Set(pack.variables.map((v) => v.id));
     const groupTypes = new Map<string, string>();
 
     pack.tileTypes.forEach((type, i) => {
@@ -142,6 +146,11 @@ export const BoardPackSchema = z
         issue(`Kein Feld vom Typ ${effect.tileType} vorhanden`, path);
       if (effect.kind === 'drawCard' && !deckIds.has(effect.deck))
         issue(`Unbekanntes Deck ${effect.deck}`, path);
+      if (
+        (effect.kind === 'setVariable' || effect.kind === 'collectVariable') &&
+        !variableIds.has(effect.variable)
+      )
+        issue(`Unbekannte Variable ${effect.variable}`, path);
       if (effect.kind === 'choice')
         effect.options.forEach((option, o) =>
           option.effects.forEach((inner, e) =>
@@ -152,6 +161,8 @@ export const BoardPackSchema = z
     const checkCondition = (condition: Condition, path: (string | number)[]) => {
       if (condition.kind === 'ownsGroup' && !groupIds.has(condition.group))
         issue(`Unbekannte Gruppe ${condition.group}`, path);
+      if (condition.kind === 'variable' && !variableIds.has(condition.variable))
+        issue(`Unbekannte Variable ${condition.variable}`, path);
     };
 
     pack.decks.forEach((deck, d) =>

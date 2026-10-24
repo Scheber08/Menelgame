@@ -1,4 +1,5 @@
 import type { ChoiceOption, Condition, CustomTile, Trigger } from '@menelgame/schema';
+import { otherParty, rentAgreements } from './agreements';
 import { charge, emit, finesRecipient, transfer, type Ctx } from './context';
 import { calculateRent } from './rent';
 import { nextFloat } from './rng';
@@ -15,7 +16,7 @@ import {
   tileState,
 } from './selectors';
 import { tileHandler, type EngineEffect, type LandingModifiers } from './tileTypes';
-import type { JailReason, Player, PlayerId } from './types';
+import type { GameState, JailReason, Player, PlayerId } from './types';
 
 /** Schutz gegen Endlosketten (z. B. Karte → Kartenfeld → Karte …). */
 const MAX_LANDINGS = 16;
@@ -136,6 +137,17 @@ function runEffect(r: Resolution, effect: EngineEffect): void {
       player(r).skipTurns += effect.turns;
       emit(ctx, { type: 'skipTurnsAdded', playerId: r.playerId, turns: effect.turns });
       return;
+    case 'setVariable':
+      setVariable(r, effect.variable, effect.op, effect.value);
+      return;
+    case 'collectVariable': {
+      const amount = Math.trunc(
+        (variableValue(state, effect.variable, r.playerId) * effect.percent) / 100,
+      );
+      if (amount > 0) transfer(ctx, 'bank', r.playerId, amount, 'variable');
+      else charge(ctx, r.playerId, finesRecipient(ctx), -amount, 'variable');
+      return;
+    }
     case 'choice':
       r.choice = effect.options;
       emit(ctx, {
@@ -193,6 +205,8 @@ function conditionHolds(r: Resolution, condition: Condition): boolean {
       return nextFloat(state.rng) * 100 < condition.percent;
     case 'ownsGroup':
       return ownsWholeGroup(state, p.id, condition.group);
+    case 'variable':
+      return cmp(variableValue(state, condition.variable, p.id), condition.op, condition.value);
   }
 }
 
@@ -319,9 +333,60 @@ function landOnOwnable(r: Resolution, tileId: string, modifiers: LandingModifier
     emit(r.ctx, { type: 'noRent', playerId: r.playerId, tileId, why: 'ownerInJail' });
     return;
   }
+  const { free, shares } = rentAgreements(state, tileId, ts.owner, r.playerId);
+  if (free) {
+    emit(r.ctx, { type: 'noRent', playerId: r.playerId, tileId, why: 'agreement' });
+    return;
+  }
   const amount = calculateRent(state, tile, ts.owner, modifiers);
   emit(r.ctx, { type: 'rentDue', playerId: r.playerId, owner: ts.owner, tileId, amount });
-  charge(r.ctx, r.playerId, ts.owner, amount, 'rent');
+  // Gewinnbeteiligung: der Anteil geht direkt an den Begünstigten (zahlt er selbst, spart er).
+  let rest = amount;
+  for (const share of shares) {
+    if (share.term.kind !== 'profitShare') continue;
+    const part = Math.min(rest, Math.floor((amount * share.term.percent) / 100));
+    const beneficiary = otherParty(share, ts.owner);
+    rest -= part;
+    if (part <= 0 || beneficiary === r.playerId) continue;
+    emit(r.ctx, {
+      type: 'rentShared',
+      agreementId: share.id,
+      from: r.playerId,
+      to: beneficiary,
+      tileId,
+      amount: part,
+    });
+    charge(r.ctx, r.playerId, beneficiary, part, 'agreement');
+  }
+  charge(r.ctx, r.playerId, ts.owner, rest, 'rent');
+}
+
+/** Wert einer Variable für einen Spieler (bzw. fürs Spiel). */
+export function variableValue(state: GameState, variable: string, playerId: PlayerId): number {
+  const scope = state.pack.variables.find((v) => v.id === variable)?.scope;
+  return (
+    (scope === 'game'
+      ? state.variables.game[variable]
+      : state.variables.players[playerId]?.[variable]) ?? 0
+  );
+}
+
+function setVariable(r: Resolution, variable: string, op: 'set' | 'add', value: number): void {
+  const state = r.ctx.state;
+  const definition = state.pack.variables.find((v) => v.id === variable);
+  if (!definition) return;
+  const from = variableValue(state, variable, r.playerId);
+  // Gleicher Wertebereich wie im Schema, damit nichts überläuft.
+  const to = Math.max(-1_000_000, Math.min(1_000_000, op === 'set' ? value : from + value));
+  if (definition.scope === 'game') state.variables.game[variable] = to;
+  else (state.variables.players[r.playerId] ??= {})[variable] = to;
+  emit(r.ctx, {
+    type: 'variableChanged',
+    variable,
+    playerId: definition.scope === 'game' ? null : r.playerId,
+    from,
+    to,
+  });
 }
 
 function drawCard(r: Resolution, deckId: string): void {

@@ -4,6 +4,7 @@ import {
   parseBoardPack,
   type BoardPack,
   type CustomTileType,
+  type Variable,
 } from '@menelgame/schema';
 import { describe, expect, it } from 'vitest';
 import { getDefaultAction, getLegalActions } from './apply';
@@ -16,13 +17,19 @@ import {
   patchPlayer,
   player,
   position,
+  rigDice,
 } from './test/helpers';
 import type { GameState } from './types';
 
 /** Standard-Pack, in dem einzelne Felder durch eigene Feldtypen ersetzt sind. */
-function packWith(types: CustomTileType[], replace: Record<string, string>): BoardPack {
+function packWith(
+  types: CustomTileType[],
+  replace: Record<string, string>,
+  variables: Variable[] = [],
+): BoardPack {
   const pack = structuredClone(standardPack);
   pack.tileTypes = types;
+  pack.variables = variables;
   pack.tiles = pack.tiles.map((t) =>
     replace[t.id]
       ? {
@@ -266,6 +273,102 @@ describe('Eigene Feldtypen', () => {
     const a = landOn(game(pack), 'p1', 'grundsteuer', [1, 3]);
     const b = landOn(game(pack), 'p1', 'grundsteuer', [1, 3]);
     expect(a.events).toEqual(b.events);
+  });
+});
+
+describe('Variablen', () => {
+  const sammelstelle: CustomTileType = {
+    id: 'sammelstelle',
+    name: 'Sammelstelle',
+    color: '#eab308',
+    rules: [
+      {
+        trigger: 'land',
+        conditions: [],
+        effects: [{ kind: 'setVariable', variable: 'sterne', op: 'add', value: 1 }],
+      },
+      {
+        trigger: 'land',
+        conditions: [{ kind: 'variable', variable: 'sterne', op: 'gte', value: 3 }],
+        effects: [
+          { kind: 'collect', amount: 300 },
+          { kind: 'setVariable', variable: 'sterne', op: 'set', value: 0 },
+        ],
+      },
+    ],
+  };
+  const kasse: CustomTileType = {
+    id: 'kasse',
+    name: 'Kasse',
+    color: '#16a34a',
+    rules: [
+      {
+        trigger: 'pass',
+        conditions: [],
+        effects: [{ kind: 'setVariable', variable: 'topf', op: 'add', value: 50 }],
+      },
+      {
+        trigger: 'land',
+        conditions: [],
+        effects: [
+          { kind: 'collectVariable', variable: 'topf', percent: 100 },
+          { kind: 'setVariable', variable: 'topf', op: 'set', value: 0 },
+        ],
+      },
+    ],
+  };
+  const pack = packWith(
+    [sammelstelle, kasse],
+    { grundsteuer: 'sammelstelle', luxusabgabe: 'kasse' },
+    [
+      { id: 'sterne', name: 'Sterne', scope: 'player', initial: 0 },
+      { id: 'topf', name: 'Topf', scope: 'game', initial: 0 },
+    ],
+  );
+
+  it('zählt pro Spieler und reagiert auf den Wert', () => {
+    let state = game(pack);
+    expect(state.variables).toEqual({
+      game: { topf: 0 },
+      players: { p1: { sterne: 0 }, p2: { sterne: 0 } },
+    });
+    for (let i = 1; i <= 3; i++) {
+      const before = cash(state, 'p1');
+      const result = landOn(state, 'p1', 'grundsteuer', [1, 3]);
+      state = { ...result.state, phase: { name: 'awaitingRoll' } };
+      expect(cash(state, 'p1')).toBe(before + (i === 3 ? 300 : 0));
+    }
+    expect(state.variables.players.p1).toEqual({ sterne: 0 });
+    expect(state.variables.players.p2).toEqual({ sterne: 0 });
+  });
+
+  it('teilt Spiel-Variablen zwischen allen Spielern', () => {
+    // p1 zieht über die Kasse (Feld 38) und füllt den Topf.
+    let state = patchPlayer(game(pack), 'p1', { position: 36 });
+    state = act(rigDice(state, [[2, 3]]), { type: 'ROLL_DICE', playerId: 'p1' }).state;
+    expect(state.variables.game.topf).toBe(50);
+    state = act(
+      { ...state, phase: { name: 'freePhase', extraRoll: false } },
+      { type: 'END_TURN', playerId: 'p1' },
+    ).state;
+    const before = cash(state, 'p2');
+    const { state: after, events } = landOn(state, 'p2', 'luxusabgabe', [1, 3]);
+    expect(cash(after, 'p2')).toBe(before + 50);
+    expect(after.variables.game.topf).toBe(0);
+    expect(events).toContainEqual({
+      type: 'variableChanged',
+      variable: 'topf',
+      playerId: null,
+      from: 50,
+      to: 0,
+    });
+  });
+
+  it('meldet unbekannte Variablen im Schema', () => {
+    const broken = parseBoardPack({ ...pack, variables: [] });
+    expect(broken.ok).toBe(false);
+    if (!broken.ok)
+      expect(broken.issues.map((i) => i.message)).toContain('Unbekannte Variable sterne');
   });
 });
 

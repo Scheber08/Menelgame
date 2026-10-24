@@ -12,3 +12,6 @@ export const MoneySchema = z.int().nonnegative();
 
 /** Hex-Farbe wie #1f6feb. */
 export const ColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i, 'Farbe als #rrggbb');
+
+/** Werte von Pack-Variablen: ganze Zahlen, auch negativ. */
+export const VariableValueSchema = z.int().min(-1_000_000).max(1_000_000);

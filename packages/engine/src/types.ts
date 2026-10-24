@@ -100,9 +100,22 @@ export interface TradeBundle {
 }
 
 /**
- * Offenes Tauschangebot. Später (Phase 6) kommen Vereinbarungen mit Laufzeit dazu, die
- * beim Annehmen zu Einträgen in state.agreements werden.
+ * Vereinbarung mit Laufzeit als Teil eines Tauschs. Begünstigt ist immer die andere Seite
+ * des Tauschs.
+ *
+ * - `rentFree`: Die andere Seite zahlt auf diesen Feldern von `owner` keine Miete.
+ * - `installments`: `payer` zahlt der anderen Seite am Ende jeder Runde `amount`.
+ * - `profitShare`: Von jeder Miete auf diesen Feldern von `owner` geht `percent` an die
+ *   andere Seite.
  */
+export type AgreementTerm =
+  | { kind: 'rentFree'; owner: PlayerId; tiles: string[]; rounds: number }
+  | { kind: 'installments'; payer: PlayerId; amount: number; rounds: number }
+  | { kind: 'profitShare'; owner: PlayerId; tiles: string[]; percent: number; rounds: number };
+
+export type AgreementKind = AgreementTerm['kind'];
+
+/** Offenes Tauschangebot, optional mit Vereinbarungen. */
 export interface TradeOffer {
   id: string;
   from: PlayerId;
@@ -111,24 +124,29 @@ export interface TradeOffer {
   give: TradeBundle;
   /** Was `from` dafür bekommt. */
   receive: TradeBundle;
+  /** Vereinbarungen, die beim Annehmen beginnen. */
+  terms: AgreementTerm[];
   /** Antwort auf dieses Angebot (Gegenangebot), sonst null. */
   counterTo: string | null;
 }
 
-/**
- * Laufende Vereinbarung zwischen Spielern (Phase 6: Mietfreiheit, Ratenzahlung,
- * Gewinnbeteiligung). In Phase 1 immer leer, aber bereits Teil des Zustands.
- */
+/** Laufende Vereinbarung zwischen zwei Spielern. */
 export interface Agreement {
   id: string;
-  kind: string;
-  parties: PlayerId[];
-  /** Restlaufzeit in Runden; null = unbefristet. */
-  remainingRounds: number | null;
-  data: Record<string, unknown>;
+  term: AgreementTerm;
+  /** Die beiden Seiten des Tauschs. */
+  parties: [PlayerId, PlayerId];
+  /** Restlaufzeit in Runden; zählt am Rundenende herunter. */
+  remainingRounds: number;
 }
 
-export const STATE_VERSION = 3;
+/** Werte der Pack-Variablen: für das ganze Spiel und pro Spieler. */
+export interface VariableState {
+  game: Record<string, number>;
+  players: Record<PlayerId, Record<string, number>>;
+}
+
+export const STATE_VERSION = 4;
 
 export interface GameState {
   stateVersion: typeof STATE_VERSION;
@@ -154,6 +172,8 @@ export interface GameState {
   turnEndHandled: number;
   nextTradeId: number;
   agreements: Agreement[];
+  nextAgreementId: number;
+  variables: VariableState;
   lastRoll: DiceRoll | null;
   /** Zählt ab 1; erhöht sich, wenn der erste aktive Spieler wieder dran ist. */
   round: number;
@@ -185,6 +205,7 @@ export type PlayerAction =
       to: PlayerId;
       give: TradeBundle;
       receive: TradeBundle;
+      terms?: AgreementTerm[];
     }
   | {
       type: 'COUNTER_TRADE';
@@ -192,6 +213,7 @@ export type PlayerAction =
       tradeId: string;
       give: TradeBundle;
       receive: TradeBundle;
+      terms?: AgreementTerm[];
     }
   | { type: 'ACCEPT_TRADE'; playerId: PlayerId; tradeId: string }
   | { type: 'REJECT_TRADE'; playerId: PlayerId; tradeId: string }
@@ -230,6 +252,8 @@ export type MoneyReason =
   | 'freeParking'
   | 'auction'
   | 'trade'
+  | 'agreement'
+  | 'variable'
   | 'bankruptcy';
 
 export type JailReason = 'tile' | 'card' | 'tripleDoubles';
@@ -253,6 +277,23 @@ export type GameEvent =
   | { type: 'tradeAccepted'; tradeId: string; from: PlayerId; to: PlayerId }
   | { type: 'tradeRejected'; tradeId: string; by: PlayerId }
   | { type: 'tradeCancelled'; tradeId: string; reason: 'withdrawn' | 'invalid' | 'countered' }
+  | { type: 'agreementStarted'; agreement: Agreement }
+  | { type: 'agreementEnded'; agreementId: string; reason: 'expired' | 'bankrupt' }
+  | {
+      type: 'rentShared';
+      agreementId: string;
+      from: PlayerId;
+      to: PlayerId;
+      tileId: string;
+      amount: number;
+    }
+  | {
+      type: 'variableChanged';
+      variable: string;
+      playerId: PlayerId | null;
+      from: number;
+      to: number;
+    }
   | { type: 'rulesUpdated'; changes: string[] }
   | { type: 'tileEffect'; playerId: PlayerId; tileId: string; trigger: string }
   | { type: 'choiceOffered'; playerId: PlayerId; options: string[] }
@@ -264,7 +305,12 @@ export type GameEvent =
   | { type: 'turnSkipped'; playerId: PlayerId; remaining: number }
   | { type: 'playerRemoved'; playerId: PlayerId }
   | { type: 'rentDue'; playerId: PlayerId; owner: PlayerId; tileId: string; amount: number }
-  | { type: 'noRent'; playerId: PlayerId; tileId: string; why: 'mortgaged' | 'ownerInJail' }
+  | {
+      type: 'noRent';
+      playerId: PlayerId;
+      tileId: string;
+      why: 'mortgaged' | 'ownerInJail' | 'agreement';
+    }
   | { type: 'cardDrawn'; playerId: PlayerId; deckId: string; cardId: string; text: string }
   | { type: 'deckEmpty'; playerId: PlayerId; deckId: string }
   | { type: 'jailFreeCardKept'; playerId: PlayerId; deckId: string }

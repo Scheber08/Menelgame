@@ -1,3 +1,4 @@
+import { endAgreementsOf } from './agreements';
 import { leaveAuction } from './auction';
 import { emit, transfer, type Ctx } from './context';
 import {
@@ -102,6 +103,7 @@ export function eliminatePlayer(
   state.debts = state.debts
     .filter((d) => d.debtor !== playerId)
     .map((d) => (d.creditor === playerId ? { ...d, creditor: 'bank' } : d));
+  endAgreementsOf(ctx, playerId);
   pruneTrades(ctx);
 
   if (checkVictory(ctx)) return;

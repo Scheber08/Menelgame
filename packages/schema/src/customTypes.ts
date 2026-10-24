@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ColorSchema, IdSchema, MoneySchema } from './common';
+import { ColorSchema, IdSchema, MoneySchema, VariableValueSchema } from './common';
 import { EffectSchema } from './effects';
 
 /** Wann eine Regel eines eigenen Feldtyps greift. */
@@ -33,7 +33,23 @@ export const ConditionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('chance'), percent: z.int().min(1).max(99) }),
   /** Spieler besitzt die ganze Gruppe. */
   z.object({ kind: z.literal('ownsGroup'), group: IdSchema }),
+  /** Wert einer Variable (pro Spieler: die des betroffenen Spielers). */
+  z.object({
+    kind: z.literal('variable'),
+    variable: IdSchema,
+    op: z.enum(['eq', 'lt', 'gte']),
+    value: VariableValueSchema,
+  }),
 ]);
+
+/** Zähler, die eigene Feldtypen und Karten setzen und abfragen können. */
+export const VariableSchema = z.object({
+  id: IdSchema,
+  name: z.string().trim().min(1).max(40),
+  /** Ein Wert pro Spieler oder einer für das ganze Spiel. */
+  scope: z.enum(['player', 'game']),
+  initial: VariableValueSchema.default(0),
+});
 
 export const TileRuleSchema = z.object({
   trigger: TriggerSchema,
@@ -57,3 +73,4 @@ export type Trigger = z.infer<typeof TriggerSchema>;
 export type Condition = z.infer<typeof ConditionSchema>;
 export type TileRule = z.infer<typeof TileRuleSchema>;
 export type CustomTileType = z.infer<typeof CustomTileTypeSchema>;
+export type Variable = z.infer<typeof VariableSchema>;

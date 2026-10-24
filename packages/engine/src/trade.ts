@@ -1,8 +1,17 @@
 import { isOwnable } from '@menelgame/schema';
+import { MAX_AGREEMENTS, startAgreements, validateTerms } from './agreements';
 import { emit, transfer, type Ctx } from './context';
 import { engineError, type ActionHandler } from './handler';
 import { getPlayer, groupTiles, requirePlayer, tileById, tileState } from './selectors';
-import type { EngineError, GameState, PhaseName, PlayerId, TradeBundle, TradeOffer } from './types';
+import type {
+  AgreementTerm,
+  EngineError,
+  GameState,
+  PhaseName,
+  PlayerId,
+  TradeBundle,
+  TradeOffer,
+} from './types';
 
 /** Höchstzahl offener Angebote im ganzen Spiel. */
 export const MAX_OPEN_TRADES = 20;
@@ -52,11 +61,16 @@ export function validateOffer(
   to: PlayerId,
   give: TradeBundle,
   receive: TradeBundle,
+  terms: readonly AgreementTerm[] = [],
 ): EngineError | null {
   const target = getPlayer(state, to);
   if (!target || target.bankrupt || to === from) return engineError('invalidTrade');
-  if (isEmpty(give) && isEmpty(receive)) return engineError('invalidTrade');
-  return validateBundle(state, from, give) ?? validateBundle(state, to, receive);
+  if (isEmpty(give) && isEmpty(receive) && terms.length === 0) return engineError('invalidTrade');
+  return (
+    validateBundle(state, from, give) ??
+    validateBundle(state, to, receive) ??
+    validateTerms(state, from, to, give, receive, terms)
+  );
 }
 
 function requireTrade(state: GameState, tradeId: string): TradeOffer | EngineError {
@@ -69,6 +83,7 @@ function createOffer(
   to: PlayerId,
   give: TradeBundle,
   receive: TradeBundle,
+  terms: readonly AgreementTerm[],
   counterTo: string | null,
 ): void {
   const trade: TradeOffer = {
@@ -81,6 +96,7 @@ function createOffer(
       tiles: [...receive.tiles],
       jailFreeCards: receive.jailFreeCards,
     },
+    terms: structuredClone([...terms]),
     counterTo,
   };
   ctx.state.trades.push(trade);
@@ -114,7 +130,10 @@ export function pruneTrades(ctx: Ctx): void {
     if (parties.some((p) => !p || p.bankrupt)) return true;
     const owns = (owner: PlayerId, tiles: string[]) =>
       tiles.every((id) => state.tiles[id]?.owner === owner);
-    return !owns(trade.from, trade.give.tiles) || !owns(trade.to, trade.receive.tiles);
+    if (!owns(trade.from, trade.give.tiles) || !owns(trade.to, trade.receive.tiles)) return true;
+    return (
+      validateTerms(state, trade.from, trade.to, trade.give, trade.receive, trade.terms) !== null
+    );
   };
   for (const trade of state.trades.filter(stale)) {
     removeTrade(ctx, trade.id);
@@ -134,10 +153,25 @@ export const tradeHandlers: {
     phases: TRADE_PHASES,
     validate: (state, action) => {
       if (state.trades.length >= MAX_OPEN_TRADES) return engineError('tooManyTrades');
-      return validateOffer(state, action.playerId, action.to, action.give, action.receive);
+      return validateOffer(
+        state,
+        action.playerId,
+        action.to,
+        action.give,
+        action.receive,
+        action.terms,
+      );
     },
     execute: (ctx, action) =>
-      createOffer(ctx, action.playerId, action.to, action.give, action.receive, null),
+      createOffer(
+        ctx,
+        action.playerId,
+        action.to,
+        action.give,
+        action.receive,
+        action.terms ?? [],
+        null,
+      ),
   },
 
   COUNTER_TRADE: {
@@ -147,13 +181,28 @@ export const tradeHandlers: {
       const trade = requireTrade(state, action.tradeId);
       if ('code' in trade) return trade;
       if (trade.to !== action.playerId) return engineError('notTradeParty');
-      return validateOffer(state, action.playerId, trade.from, action.give, action.receive);
+      return validateOffer(
+        state,
+        action.playerId,
+        trade.from,
+        action.give,
+        action.receive,
+        action.terms,
+      );
     },
     execute: (ctx, action) => {
       const trade = requireTrade(ctx.state, action.tradeId) as TradeOffer;
       removeTrade(ctx, trade.id);
       emit(ctx, { type: 'tradeCancelled', tradeId: trade.id, reason: 'countered' });
-      createOffer(ctx, action.playerId, trade.from, action.give, action.receive, trade.id);
+      createOffer(
+        ctx,
+        action.playerId,
+        trade.from,
+        action.give,
+        action.receive,
+        action.terms ?? [],
+        trade.id,
+      );
     },
   },
 
@@ -164,13 +213,16 @@ export const tradeHandlers: {
       const trade = requireTrade(state, action.tradeId);
       if ('code' in trade) return trade;
       if (trade.to !== action.playerId) return engineError('notTradeParty');
-      return validateOffer(state, trade.from, trade.to, trade.give, trade.receive);
+      if (state.agreements.length + trade.terms.length > MAX_AGREEMENTS)
+        return engineError('tooManyTrades');
+      return validateOffer(state, trade.from, trade.to, trade.give, trade.receive, trade.terms);
     },
     execute: (ctx, action) => {
       const trade = requireTrade(ctx.state, action.tradeId) as TradeOffer;
       removeTrade(ctx, trade.id);
       moveBundle(ctx, trade.from, trade.to, trade.give);
       moveBundle(ctx, trade.to, trade.from, trade.receive);
+      startAgreements(ctx, trade);
       emit(ctx, { type: 'tradeAccepted', tradeId: trade.id, from: trade.from, to: trade.to });
       pruneTrades(ctx);
     },

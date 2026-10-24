@@ -1,3 +1,4 @@
+import { agreementsRoundEnd } from './agreements';
 import { startAuctions } from './auction';
 import { emit, type Ctx } from './context';
 import { hasRules, moveForward, runCustomRules, startResolution, type Resolution } from './effects';
@@ -84,6 +85,7 @@ export function extraRollOf(point: ResumePoint): boolean {
 /** Regeln eigener Feldtypen am Rundenende für alle, die auf einem solchen Feld stehen. */
 function roundEnd(ctx: Ctx): void {
   const state = ctx.state;
+  agreementsRoundEnd(ctx);
   for (const [tileId, rounds] of Object.entries(state.blockedTiles)) {
     if (rounds <= 1) {
       delete state.blockedTiles[tileId];

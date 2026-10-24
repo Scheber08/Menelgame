@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IdSchema, MoneySchema } from './common';
+import { IdSchema, MoneySchema, VariableValueSchema } from './common';
 
 /**
  * Feste, deklarative Aktionen. Karten und eigene Feldtypen nutzen sie direkt; eingebaute
@@ -54,6 +54,19 @@ const baseEffects = [
   z.object({ kind: z.literal('blockTile'), rounds: z.int().min(1).max(20) }),
   /** Der Spieler setzt so viele Züge aus. */
   z.object({ kind: z.literal('skipTurns'), turns: z.int().min(1).max(5) }),
+  /** Variable setzen oder ändern (pro Spieler: die des betroffenen Spielers). */
+  z.object({
+    kind: z.literal('setVariable'),
+    variable: IdSchema,
+    op: z.enum(['set', 'add']),
+    value: VariableValueSchema,
+  }),
+  /** Spieler bekommt den Wert einer Variable (× Prozent) von der Bank; negativ = zahlen. */
+  z.object({
+    kind: z.literal('collectVariable'),
+    variable: IdSchema,
+    percent: z.int().min(1).max(1000).default(100),
+  }),
 ] as const;
 
 export const BaseEffectSchema = z.discriminatedUnion('kind', [...baseEffects]);

@@ -6,6 +6,7 @@ import {
   type GameState,
   type Player,
   type TileState,
+  type VariableState,
 } from './types';
 
 export interface PlayerSetup {
@@ -90,9 +91,26 @@ export function createGame(setup: GameSetup): GameState {
     blockedTiles: {},
     turnEndHandled: 0,
     agreements: [],
+    nextAgreementId: 1,
+    variables: initialVariables(
+      pack,
+      initialPlayers.map((p) => p.id),
+    ),
     lastRoll: null,
     round: 1,
     turn: 1,
     actionCount: 0,
   };
+}
+
+/** Startwerte der Pack-Variablen: einmal fürs Spiel, einmal pro Spieler. */
+function initialVariables(pack: BoardPack, playerIds: string[]): VariableState {
+  const game: Record<string, number> = {};
+  const players: Record<string, Record<string, number>> = {};
+  for (const id of playerIds) players[id] = {};
+  for (const v of pack.variables) {
+    if (v.scope === 'game') game[v.id] = v.initial;
+    else for (const id of playerIds) players[id]![v.id] = v.initial;
+  }
+  return { game, players };
 }
