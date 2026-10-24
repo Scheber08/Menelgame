@@ -128,6 +128,21 @@ export const api = {
     return request<RuleSet>('/api/rulesets', { method: 'POST', body: input });
   },
   deleteRuleSet: (id: string) => request<unknown>(`/api/rulesets/${id}`, { method: 'DELETE' }),
+  /** Bild hochladen (PNG, JPEG, WebP, GIF bis 1 MB); liefert die URL unter /img/…. */
+  uploadImage: async (file: File) => {
+    const credentials = await ensureProfile();
+    const response = await fetch('/api/images', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${credentials.id}:${credentials.secret}`,
+        'Content-Type': file.type,
+      },
+      body: file,
+    });
+    const body = (await response.json().catch(() => null)) as { url?: string } | null;
+    if (!response.ok || !body?.url) throw new ApiFailure(response.status, null);
+    return body.url;
+  },
 };
 
 export function shareLink(id: string, key: string): string {

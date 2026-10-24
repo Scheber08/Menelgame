@@ -4,8 +4,18 @@ import { useMemo, useState } from 'react';
 import { Board } from '../board/Board';
 
 /** Brett eines Packs zur Ansicht, ohne Spiel. */
-export function PackPreview({ pack }: { pack: BoardPack }) {
-  const [selected, setSelected] = useState<string | null>(null);
+export function PackPreview({
+  pack,
+  selected: selectedProp,
+  onSelect,
+}: {
+  pack: BoardPack;
+  selected?: string | null;
+  onSelect?: (tileId: string) => void;
+}) {
+  const [own, setOwn] = useState<string | null>(null);
+  const selected = selectedProp !== undefined ? selectedProp : own;
+  const setSelected = onSelect ?? setOwn;
   const state = useMemo(() => {
     try {
       return createGame({

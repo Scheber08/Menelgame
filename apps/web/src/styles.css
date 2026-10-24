@@ -1416,3 +1416,198 @@ fieldset.rules-grid {
 .lobby-cards .my-cards {
   margin-top: 0.75rem;
 }
+
+/* Eigene Feldtypen, Theme */
+
+.board .tile-label {
+  color: var(--board-text, var(--text));
+}
+
+.board.font-serif {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.board.font-rounded {
+  font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+}
+
+.board.font-mono {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+.blocked-stripe {
+  fill: rgba(220, 60, 60, 0.35);
+}
+
+.blocked {
+  pointer-events: none;
+}
+
+.center-image {
+  max-width: 70%;
+  max-height: 35%;
+  object-fit: contain;
+}
+
+.rule-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.effect.choice {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--border);
+}
+
+.choice-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* Brett-Editor */
+
+.board-tab-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 700px) {
+  .board-tab-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sortable-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.sortable-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.sortable-tile.selected {
+  background: var(--surface-2);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.drag-handle {
+  cursor: grab;
+  border: none;
+  background: none;
+  padding: 0.35rem 0.4rem;
+  color: var(--muted);
+  touch-action: none;
+}
+
+.tile-pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: none;
+  background: none;
+  padding: 0.35rem 0.25rem;
+  text-align: left;
+}
+
+.add-tile {
+  margin: 0 0 0.25rem;
+}
+
+.properties h3 {
+  margin-top: 0;
+}
+
+.image-upload img {
+  max-width: 160px;
+  max-height: 100px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* Feldtyp-Baukasten */
+
+.type-editor {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.type-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.type-head input[type='color'] {
+  width: 2.6rem;
+  height: 2.2rem;
+  padding: 0.1rem;
+}
+
+.rule-block {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rule-row {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.block-label {
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  padding-top: 0.45rem;
+}
+
+.conditions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.color-row input[type='color'] {
+  width: 3rem;
+  height: 2.2rem;
+  padding: 0.1rem;
+}

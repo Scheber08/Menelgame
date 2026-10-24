@@ -1,26 +1,32 @@
-import { parseBoardPack, type BoardPack, type Tile } from '@menelgame/schema';
+import { randomizeBoard } from '@menelgame/packs';
+import { parseBoardPack, type BoardPack } from '@menelgame/schema';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EffectEditor, effectContext } from '../components/EffectEditor';
 import { NumberField, TextField } from '../components/fields';
 import { PackPreview } from '../components/PackPreview';
 import { RulesForm } from '../components/RulesForm';
+import { BoardTab } from '../editor/BoardTab';
+import { ThemeTab } from '../editor/ThemeTab';
+import { TileTypesTab } from '../editor/TileTypesTab';
 import { api, ApiFailure, downloadJson, shareLink } from '../game/api';
+import { saveTestGame } from '../game/useHotSeatGame';
 import { navigate } from '../router';
 
-type Tab = 'general' | 'tiles' | 'groups' | 'cards' | 'rules' | 'json';
-const TABS: Tab[] = ['general', 'tiles', 'groups', 'cards', 'rules', 'json'];
+type Tab = 'general' | 'board' | 'groups' | 'cards' | 'types' | 'theme' | 'rules' | 'json';
+const TABS: Tab[] = ['general', 'board', 'groups', 'cards', 'types', 'theme', 'rules', 'json'];
 
 /**
- * Inhalts-Editor für eigene Packs: Felder, Gruppen, Karten und Standardregeln. Die Form des
- * Bretts (Anzahl und Reihenfolge der Felder) ändert erst der Brett-Editor in Phase 5.
+ * Pack-Editor: Brett (Form, Reihenfolge, Felder), Gruppen, Karten, eigene Feldtypen,
+ * Aussehen und Standardregeln. Jede Änderung wird live mit dem Zod-Schema geprüft.
  */
 export function PackEditorPage({ id }: { id: string }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<BoardPack | null>(null);
   const [saved, setSaved] = useState<string>('');
   const [shareKey, setShareKey] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('tiles');
+  const [tab, setTab] = useState<Tab>('board');
+  const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -45,8 +51,6 @@ export function PackEditorPage({ id }: { id: string }) {
 
   const dirty = JSON.stringify(draft) !== saved;
   const update = (patch: Partial<BoardPack>) => setDraft({ ...draft, ...patch });
-  const setTile = (index: number, tile: Tile) =>
-    update({ tiles: draft.tiles.map((x, i) => (i === index ? tile : x)) });
 
   const save = async () => {
     if (!validation.ok) return;
@@ -66,6 +70,19 @@ export function PackEditorPage({ id }: { id: string }) {
     }
   };
 
+  const randomBoard = async () => {
+    if (!validation.ok) return;
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
+    const created = await api.createPack(randomizeBoard(validation.pack, seed));
+    navigate(`/packs/${created.id}`);
+  };
+
+  const testGame = () => {
+    if (!validation.ok) return;
+    saveTestGame(validation.pack);
+    navigate('/lokal');
+  };
+
   return (
     <main className="editor">
       <div className="editor-head">
@@ -83,6 +100,12 @@ export function PackEditorPage({ id }: { id: string }) {
             onClick={() => void save()}
           >
             {dirty ? t('editor.save') : t('editor.allSaved')}
+          </button>
+          <button type="button" disabled={!validation.ok} onClick={testGame}>
+            {t('editor.testGame')}
+          </button>
+          <button type="button" disabled={!validation.ok} onClick={() => void randomBoard()}>
+            {t('editor.randomBoard')}
           </button>
           <button type="button" onClick={() => downloadJson(`${draft.meta.id}.json`, draft)}>
             {t('packs.export')}
@@ -175,136 +198,20 @@ export function PackEditorPage({ id }: { id: string }) {
             </div>
           )}
 
-          {tab === 'tiles' && (
-            <ol className="tile-editor-list">
-              {draft.tiles.map((tile, index) => (
-                <li key={tile.id}>
-                  <details>
-                    <summary>
-                      <span className="muted">{index}</span> {tile.name}{' '}
-                      <span className="badge">{t(`tile.types.${tile.type}`)}</span>
-                    </summary>
-                    <TileEditor
-                      pack={draft}
-                      tile={tile}
-                      onChange={(next) => setTile(index, next)}
-                    />
-                  </details>
-                </li>
-              ))}
-            </ol>
+          {tab === 'board' && (
+            <BoardTab pack={draft} onChange={update} selected={selected} onSelect={setSelected} />
           )}
 
-          {tab === 'groups' && (
-            <div className="group-editor">
-              {draft.groups.map((group, gi) => (
-                <div key={group.id} className="group-row">
-                  <input
-                    type="color"
-                    aria-label={t('editor.color')}
-                    value={group.color}
-                    onChange={(e) =>
-                      update({
-                        groups: draft.groups.map((g, j) =>
-                          j === gi ? { ...g, color: e.target.value } : g,
-                        ),
-                      })
-                    }
-                  />
-                  <input
-                    aria-label={t('editor.name')}
-                    value={group.name}
-                    maxLength={60}
-                    onChange={(e) =>
-                      update({
-                        groups: draft.groups.map((g, j) =>
-                          j === gi ? { ...g, name: e.target.value } : g,
-                        ),
-                      })
-                    }
-                  />
-                </div>
-              ))}
-            </div>
+          {tab === 'groups' && <GroupsEditor pack={draft} onChange={update} />}
+
+          {tab === 'cards' && <CardsEditor pack={draft} onChange={update} />}
+
+          {tab === 'types' && (
+            <TileTypesTab pack={draft} onChange={(tileTypes) => update({ tileTypes })} />
           )}
 
-          {tab === 'cards' && (
-            <div className="deck-editor">
-              {draft.decks.map((deck, di) => {
-                const setDeck = (next: typeof deck) =>
-                  update({ decks: draft.decks.map((d, j) => (j === di ? next : d)) });
-                return (
-                  <section key={deck.id} className="deck">
-                    <h3>
-                      <input
-                        aria-label={t('editor.name')}
-                        value={deck.name}
-                        maxLength={60}
-                        onChange={(e) => setDeck({ ...deck, name: e.target.value })}
-                      />
-                    </h3>
-                    {deck.cards.map((card, ci) => (
-                      <div key={card.id} className="card-row">
-                        <TextField
-                          label={t('editor.cardText')}
-                          value={card.text}
-                          maxLength={300}
-                          multiline
-                          onChange={(text) =>
-                            setDeck({
-                              ...deck,
-                              cards: deck.cards.map((c, j) => (j === ci ? { ...c, text } : c)),
-                            })
-                          }
-                        />
-                        <EffectEditor
-                          effects={card.effects}
-                          context={effectContext(draft)}
-                          onChange={(effects) =>
-                            setDeck({
-                              ...deck,
-                              cards: deck.cards.map((c, j) => (j === ci ? { ...c, effects } : c)),
-                            })
-                          }
-                        />
-                        {deck.cards.length > 1 && (
-                          <button
-                            type="button"
-                            className="link danger-link"
-                            onClick={() =>
-                              setDeck({ ...deck, cards: deck.cards.filter((_, j) => j !== ci) })
-                            }
-                          >
-                            {t('editor.removeCard')}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const ids = new Set(deck.cards.map((c) => c.id));
-                        let n = deck.cards.length + 1;
-                        while (ids.has(`karte-${n}`)) n++;
-                        setDeck({
-                          ...deck,
-                          cards: [
-                            ...deck.cards,
-                            {
-                              id: `karte-${n}`,
-                              text: t('editor.newCard'),
-                              effects: [{ kind: 'collect', amount: 50 }],
-                            },
-                          ],
-                        });
-                      }}
-                    >
-                      {t('editor.addCard')}
-                    </button>
-                  </section>
-                );
-              })}
-            </div>
+          {tab === 'theme' && (
+            <ThemeTab theme={draft.theme} onChange={(theme) => update({ theme })} />
           )}
 
           {tab === 'rules' && (
@@ -323,117 +230,159 @@ export function PackEditorPage({ id }: { id: string }) {
           {tab === 'json' && <JsonEditor pack={draft} onApply={setDraft} />}
         </section>
         <aside className="editor-preview">
-          <PackPreview pack={validation.ok ? validation.pack : JSON.parse(saved)} />
+          <PackPreview
+            pack={validation.ok ? validation.pack : JSON.parse(saved)}
+            selected={selected}
+            onSelect={setSelected}
+          />
         </aside>
       </div>
     </main>
   );
 }
 
-function TileEditor({
+function GroupsEditor({
   pack,
-  tile,
   onChange,
 }: {
   pack: BoardPack;
-  tile: Tile;
-  onChange: (tile: Tile) => void;
+  onChange: (patch: Partial<BoardPack>) => void;
 }) {
   const { t } = useTranslation();
-  const groups = (type: string) => {
-    const used = new Set(
-      pack.tiles
-        .filter((x) => x.type === type && 'group' in x)
-        .map((x) => ('group' in x ? x.group : '')),
-    );
-    return pack.groups.filter(
-      (g) => used.has(g.id) || !pack.tiles.some((x) => 'group' in x && x.group === g.id),
-    );
-  };
-  const money = (label: string, value: number, update: (n: number) => void) => (
-    <NumberField
-      key={label}
-      label={label}
-      value={value}
-      step={10}
-      max={100_000}
-      onChange={update}
-    />
-  );
-
+  const used = (id: string) => pack.tiles.some((x) => 'group' in x && x.group === id);
+  const set = (i: number, patch: Partial<BoardPack['groups'][number]>) =>
+    onChange({ groups: pack.groups.map((g, j) => (j === i ? { ...g, ...patch } : g)) });
   return (
-    <div className="tile-editor rules-grid">
-      <TextField
-        label={t('editor.name')}
-        value={tile.name}
-        maxLength={60}
-        onChange={(name) => onChange({ ...tile, name })}
-      />
-      {'group' in tile && (
-        <label className="field">
-          {t('editor.group')}
-          <select value={tile.group} onChange={(e) => onChange({ ...tile, group: e.target.value })}>
-            {groups(tile.type).map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {'price' in tile &&
-        money(t('tile.price'), tile.price, (price) => onChange({ ...tile, price }))}
-      {tile.type === 'property' && (
-        <>
-          {money(t('tile.houseCost'), tile.houseCost, (houseCost) =>
-            onChange({ ...tile, houseCost }),
-          )}
-          {tile.rent.map((rent, i) =>
-            money(
-              i === 0
-                ? t('tile.rentBase')
-                : i === 5
-                  ? t('tile.rentHotel')
-                  : t('tile.rentHouses', { count: i }),
-              rent,
-              (n) => onChange({ ...tile, rent: tile.rent.map((r, j) => (j === i ? n : r)) }),
-            ),
-          )}
-        </>
-      )}
-      {tile.type === 'station' &&
-        tile.rent.map((rent, i) =>
-          money(t('tile.stationRent', { count: i + 1 }), rent, (n) =>
-            onChange({ ...tile, rent: tile.rent.map((r, j) => (j === i ? n : r)) }),
-          ),
-        )}
-      {tile.type === 'utility' &&
-        tile.multipliers.map((m, i) => (
-          <NumberField
-            key={i}
-            label={t('editor.utilityFactor', { count: i + 1 })}
-            value={m}
-            min={1}
-            max={100}
-            onChange={(n) =>
-              onChange({ ...tile, multipliers: tile.multipliers.map((x, j) => (j === i ? n : x)) })
-            }
+    <div className="group-editor">
+      {pack.groups.map((group, gi) => (
+        <div key={group.id} className="group-row">
+          <input
+            type="color"
+            aria-label={t('editor.color')}
+            value={group.color}
+            onChange={(e) => set(gi, { color: e.target.value })}
           />
-        ))}
-      {tile.type === 'tax' &&
-        money(t('editor.amount'), tile.amount, (amount) => onChange({ ...tile, amount }))}
-      {tile.type === 'card' && (
-        <label className="field">
-          {t('editor.deck')}
-          <select value={tile.deck} onChange={(e) => onChange({ ...tile, deck: e.target.value })}>
-            {pack.decks.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
+          <input
+            aria-label={t('editor.name')}
+            value={group.name}
+            maxLength={60}
+            onChange={(e) => set(gi, { name: e.target.value })}
+          />
+          <button
+            type="button"
+            className="link danger-link"
+            disabled={used(group.id)}
+            title={used(group.id) ? t('editor.groupInUse') : undefined}
+            onClick={() => onChange({ groups: pack.groups.filter((_, j) => j !== gi) })}
+          >
+            {t('editor.remove')}
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => {
+          const ids = new Set(pack.groups.map((g) => g.id));
+          let n = pack.groups.length + 1;
+          while (ids.has(`gruppe-${n}`)) n++;
+          onChange({
+            groups: [
+              ...pack.groups,
+              { id: `gruppe-${n}`, name: t('editor.newGroup'), color: '#888888' },
+            ],
+          });
+        }}
+      >
+        {t('editor.addGroup')}
+      </button>
+    </div>
+  );
+}
+
+function CardsEditor({
+  pack,
+  onChange,
+}: {
+  pack: BoardPack;
+  onChange: (patch: Partial<BoardPack>) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="deck-editor">
+      {pack.decks.map((deck, di) => {
+        const setDeck = (next: typeof deck) =>
+          onChange({ decks: pack.decks.map((d, j) => (j === di ? next : d)) });
+        return (
+          <section key={deck.id} className="deck">
+            <h3>
+              <input
+                aria-label={t('editor.name')}
+                value={deck.name}
+                maxLength={60}
+                onChange={(e) => setDeck({ ...deck, name: e.target.value })}
+              />
+            </h3>
+            {deck.cards.map((card, ci) => (
+              <div key={card.id} className="card-row">
+                <TextField
+                  label={t('editor.cardText')}
+                  value={card.text}
+                  maxLength={300}
+                  multiline
+                  onChange={(text) =>
+                    setDeck({
+                      ...deck,
+                      cards: deck.cards.map((c, j) => (j === ci ? { ...c, text } : c)),
+                    })
+                  }
+                />
+                <EffectEditor
+                  effects={card.effects}
+                  context={effectContext(pack)}
+                  onChange={(effects) =>
+                    setDeck({
+                      ...deck,
+                      cards: deck.cards.map((c, j) => (j === ci ? { ...c, effects } : c)),
+                    })
+                  }
+                />
+                {deck.cards.length > 1 && (
+                  <button
+                    type="button"
+                    className="link danger-link"
+                    onClick={() =>
+                      setDeck({ ...deck, cards: deck.cards.filter((_, j) => j !== ci) })
+                    }
+                  >
+                    {t('editor.removeCard')}
+                  </button>
+                )}
+              </div>
             ))}
-          </select>
-        </label>
-      )}
+            <button
+              type="button"
+              onClick={() => {
+                const ids = new Set(deck.cards.map((c) => c.id));
+                let n = deck.cards.length + 1;
+                while (ids.has(`karte-${n}`)) n++;
+                setDeck({
+                  ...deck,
+                  cards: [
+                    ...deck.cards,
+                    {
+                      id: `karte-${n}`,
+                      text: t('editor.newCard'),
+                      effects: [{ kind: 'collect', amount: 50 }],
+                    },
+                  ],
+                });
+              }}
+            >
+              {t('editor.addCard')}
+            </button>
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -473,7 +422,11 @@ function JsonEditor({ pack, onApply }: { pack: BoardPack; onApply: (pack: BoardP
           {t('editor.resetJson')}
         </button>
       </div>
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p className="error" style={{ whiteSpace: 'pre-line' }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
