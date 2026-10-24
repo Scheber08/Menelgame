@@ -23,9 +23,40 @@ export interface SqlDatabase {
   prepare(query: string): SqlStatement;
 }
 
+/** Ablage für hochgeladene Bilder (R2; in Tests im Speicher). */
+export interface ImageStore {
+  put(key: string, data: ArrayBuffer, contentType: string): Promise<void>;
+  get(key: string): Promise<{ body: ArrayBuffer | ReadableStream; contentType: string } | null>;
+}
+
 export interface ApiDeps {
   db: SqlDatabase;
   now(): number;
+  images?: ImageStore;
+}
+
+export const MAX_IMAGE_BYTES = 1024 * 1024;
+const IMAGE_TYPES: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+
+/** Liefert ein hochgeladenes Bild unter /img/<schlüssel> aus. */
+export async function serveImage(path: string, images: ImageStore): Promise<Response> {
+  const key = path.replace(/^\/img\//, '');
+  if (!/^[a-z0-9]{16}\/[a-z0-9]{16}\.(png|jpg|webp|gif)$/.test(key))
+    return new Response('Nicht gefunden', { status: 404 });
+  const image = await images.get(key);
+  if (!image) return new Response('Nicht gefunden', { status: 404 });
+  return new Response(image.body, {
+    headers: {
+      'Content-Type': image.contentType,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 }
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -119,6 +150,22 @@ export async function handleApi(request: Request, deps: ApiDeps): Promise<Respon
       return me ? json({ id: me }) : fail('unauthorized', 401);
     }
     return fail('badRequest', 405);
+  }
+
+  // ---- Bilder ----------------------------------------------------------------------------
+  if (path === '/api/images') {
+    if (method !== 'POST' || !deps.images) return fail('badRequest', 405);
+    const me = await authenticate(request, deps);
+    if (!me) return fail('unauthorized', 401);
+    const contentType = (request.headers.get('Content-Type') ?? '').split(';')[0]!.trim();
+    const ext = IMAGE_TYPES[contentType];
+    if (!ext) return fail('badRequest', 415);
+    const data = await request.arrayBuffer();
+    if (data.byteLength === 0) return fail('badRequest', 400);
+    if (data.byteLength > MAX_IMAGE_BYTES) return fail('tooLarge', 413);
+    const key = `${me}/${randomId()}.${ext}`;
+    await deps.images.put(key, data, contentType);
+    return json({ url: `/img/${key}` }, 201);
   }
 
   // ---- Packs -----------------------------------------------------------------------------

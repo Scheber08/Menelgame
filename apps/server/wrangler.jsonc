@@ -8,7 +8,7 @@
     "directory": "../web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/r/*/ws"],
+    "run_worker_first": ["/api/*", "/r/*/ws", "/img/*"],
   },
   "durable_objects": {
     "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }],
@@ -24,6 +24,9 @@
       "migrations_dir": "migrations",
     },
   ],
+  // Hochgeladene Bilder für Packs. Für das Deployment einmal anlegen:
+  //   pnpm --filter @menelgame/server exec wrangler r2 bucket create menelgame-images
+  "r2_buckets": [{ "binding": "IMAGES", "bucket_name": "menelgame-images" }],
   // Free Plan: nur SQLite-gestützte Durable Objects.
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }],
   "observability": { "enabled": true },

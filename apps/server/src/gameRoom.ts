@@ -14,6 +14,7 @@ export interface Env {
   ROOMS: DurableObjectNamespace<GameRoom>;
   ASSETS: Fetcher;
   DB: D1Database;
+  IMAGES: R2Bucket;
 }
 
 interface Attachment {

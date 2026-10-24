@@ -3,7 +3,7 @@ import type { PackResponse, PackSummary, ProfileCredentials, RuleSet } from '@me
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { handleApi, type SqlDatabase, type SqlStatement } from './api';
+import { handleApi, serveImage, type ImageStore, type SqlDatabase, type SqlStatement } from './api';
 
 /** D1-ähnliche Hülle um node:sqlite, damit die API ohne Cloudflare testbar ist. */
 function sqliteDb(): SqlDatabase {
@@ -20,6 +20,13 @@ function sqliteDb(): SqlDatabase {
 
 let db: SqlDatabase;
 let clock = 1000;
+const stored = new Map<string, { body: ArrayBuffer; contentType: string }>();
+const images: ImageStore = {
+  put: async (key, body, contentType) => {
+    stored.set(key, { body, contentType });
+  },
+  get: async (key) => stored.get(key) ?? null,
+};
 
 async function call(
   method: string,
@@ -33,7 +40,7 @@ async function call(
     headers,
     ...(options.body !== undefined && { body: JSON.stringify(options.body) }),
   });
-  const response = await handleApi(request, { db, now: () => ++clock });
+  const response = await handleApi(request, { db, now: () => ++clock, images });
   if (!response) throw new Error(`Kein Handler für ${path}`);
   return { status: response.status, body: await response.json() };
 }
@@ -203,5 +210,38 @@ describe('Regelsets', () => {
       body: { name: 'Kaputt', rules: { startingCash: -1 }, dice: {} },
     });
     expect(result).toEqual({ status: 422, body: { error: 'invalidRuleSet' } });
+  });
+});
+
+describe('Bilder', () => {
+  async function upload(auth: ProfileCredentials | undefined, type: string, bytes: number) {
+    const headers: Record<string, string> = { 'Content-Type': type };
+    if (auth) headers.Authorization = `Bearer ${auth.id}:${auth.secret}`;
+    const request = new Request('http://test/api/images', {
+      method: 'POST',
+      headers,
+      body: new Uint8Array(bytes).fill(7),
+    });
+    const response = (await handleApi(request, { db, now: () => ++clock, images }))!;
+    return { status: response.status, body: (await response.json()) as { url?: string } };
+  }
+
+  it('speichert Bilder eines Profils und liefert sie aus', async () => {
+    const me = await newProfile();
+    const result = await upload(me, 'image/png', 100);
+    expect(result.status).toBe(201);
+    expect(result.body.url).toMatch(new RegExp(`^/img/${me.id}/[a-z0-9]{16}[.]png$`));
+    const served = await serveImage(result.body.url!, images);
+    expect(served.status).toBe(200);
+    expect(served.headers.get('Content-Type')).toBe('image/png');
+    expect((await served.arrayBuffer()).byteLength).toBe(100);
+  });
+
+  it('verlangt Profil, Bildformat und Größenlimit', async () => {
+    const me = await newProfile();
+    expect((await upload(undefined, 'image/png', 10)).status).toBe(401);
+    expect((await upload(me, 'text/html', 10)).status).toBe(415);
+    expect((await upload(me, 'image/png', 1024 * 1024 + 1)).status).toBe(413);
+    expect((await serveImage('/img/../etwas', images)).status).toBe(404);
   });
 });

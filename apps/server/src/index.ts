@@ -1,5 +1,5 @@
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, type CreateRoomResponse } from '@menelgame/protocol';
-import { handleApi, type SqlDatabase } from './api';
+import { handleApi, serveImage, type ImageStore, type SqlDatabase } from './api';
 import type { Env } from './gameRoom';
 
 export { GameRoom } from './gameRoom';
@@ -44,7 +44,27 @@ export default {
       return result ? json(result) : json({ error: 'notFound' }, 404);
     }
 
-    const api = await handleApi(request, { db: env.DB as unknown as SqlDatabase, now: Date.now });
+    const images: ImageStore = {
+      put: async (key, data, contentType) => {
+        await env.IMAGES.put(key, data, { httpMetadata: { contentType } });
+      },
+      get: async (key) => {
+        const object = await env.IMAGES.get(key);
+        return object
+          ? {
+              body: object.body,
+              contentType: object.httpMetadata?.contentType ?? 'application/octet-stream',
+            }
+          : null;
+      },
+    };
+    if (url.pathname.startsWith('/img/')) return serveImage(url.pathname, images);
+
+    const api = await handleApi(request, {
+      db: env.DB as unknown as SqlDatabase,
+      now: Date.now,
+      images,
+    });
     if (api) return api;
 
     const socket = url.pathname.match(/^\/r\/([A-Z0-9]+)\/ws$/);
