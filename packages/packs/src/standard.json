@@ -292,7 +292,7 @@
     },
     {
       "id": "seilbahn",
-      "name": "Seilbahnstation",
+      "name": "Seilbahn",
       "type": "station",
       "group": "verkehr",
       "price": 200,
