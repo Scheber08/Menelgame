@@ -1,7 +1,23 @@
 {
   "name": "@menelgame/server",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Platzhalter: Cloudflare Worker + Durable Object pro Spielraum (Phase 2)"
+  "description": "Cloudflare Worker + Durable Object pro Spielraum",
+  "scripts": {
+    "dev": "node scripts/ensure-assets.mjs && wrangler dev --port 8787",
+    "build": "tsc -p tsconfig.json",
+    "check": "node scripts/ensure-assets.mjs && wrangler deploy --dry-run --outdir dist",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@menelgame/engine": "workspace:*",
+    "@menelgame/packs": "workspace:*",
+    "@menelgame/protocol": "workspace:*",
+    "@menelgame/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260702.1",
+    "wrangler": "4.149.0"
+  }
 }

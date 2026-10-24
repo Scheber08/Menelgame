@@ -1,0 +1,17 @@
+{
+  "name": "@menelgame/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@menelgame/engine": "workspace:*",
+    "@menelgame/schema": "workspace:*",
+    "zod": "^4.1.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}
