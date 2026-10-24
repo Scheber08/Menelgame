@@ -1,9 +1,11 @@
-import type { Action } from '@menelgame/engine';
+import { replay, type Action, type GameLog } from '@menelgame/engine';
 import type { RoomInfoResponse, ServerMessage } from '@menelgame/protocol';
 import { DurableObject } from 'cloudflare:workers';
 import {
   newRoomData,
   Room,
+  seatClaim,
+  type SeatClaim,
   type Connection,
   type GameRecord,
   type RoomData,
@@ -90,6 +92,20 @@ export class GameRoom extends DurableObject<Env> implements RoomHost {
       .toArray()
       .map((row) => JSON.parse(row.json) as Action);
     return { initial, actions };
+  }
+
+  /**
+   * Ergebnis für die Statistik: nur mit dem geheimen Token eines menschlichen Platzes und
+   * erst nach Spielende. Das Spiel wird aus dem vollständigen Log nachgespielt.
+   */
+  async claim(token: string): Promise<SeatClaim | 'notFinished' | null> {
+    const seat = this.room?.data.seats.find((s) => s.bot === null && s.token === token);
+    if (!this.room || !seat) return null;
+    if (this.room.data.status !== 'finished') return 'notFinished';
+    const log = await this.log();
+    if (!log || log === 'notFinished') return null;
+    const { state, events } = replay(log as GameLog);
+    return seatClaim(this.room.data, seat.id, state, events);
   }
 
   override async fetch(request: Request): Promise<Response> {

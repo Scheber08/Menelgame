@@ -288,6 +288,7 @@ export interface RoomInfoResponse {
   maxPlayers: number;
 }
 export * from './api';
+export * from './stats';
 
 /**
  * Zustand für Clients: ohne Zufallszustand (künftige Würfe), ohne Kartenreihenfolge und

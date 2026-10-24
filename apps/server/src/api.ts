@@ -1,12 +1,19 @@
 import {
+  earnedAchievements,
   MAX_PACK_BYTES,
   MAX_PACKS_PER_PROFILE,
   MAX_RULESETS_PER_PROFILE,
+  ROOM_CODE_PATTERN,
   RuleSetInputSchema,
+  titleOf,
+  totalsOf,
   type ApiError,
+  type ClaimResponse,
+  type GameResult,
   type PackResponse,
   type PackSummary,
   type ProfileCredentials,
+  type ProfileStatsResponse,
   type RuleSet,
 } from '@menelgame/protocol';
 import { parseBoardPack } from '@menelgame/schema';
@@ -29,10 +36,20 @@ export interface ImageStore {
   get(key: string): Promise<{ body: ArrayBuffer | ReadableStream; contentType: string } | null>;
 }
 
+/** Ergebnis eines Platzes nach Spielende, vom Durable Object des Raums. */
+export interface SeatResult {
+  seatId: string;
+  packName: string;
+  bots: GameResult['bots'];
+  stats: GameResult['stats'];
+}
+
 export interface ApiDeps {
   db: SqlDatabase;
   now(): number;
   images?: ImageStore;
+  /** Fragt den Raum nach dem Ergebnis des Platzes mit diesem Token. */
+  claimSeat?: (code: string, token: string) => Promise<SeatResult | 'notFinished' | null>;
 }
 
 export const MAX_IMAGE_BYTES = 1024 * 1024;
@@ -91,6 +108,14 @@ async function authenticate(request: Request, deps: ApiDeps): Promise<string | n
     .first<{ secret_hash: string }>();
   if (!row || row.secret_hash !== (await sha256(match[2]!))) return null;
   return match[1]!;
+}
+
+async function loadResults(db: SqlDatabase, profileId: string): Promise<GameResult[]> {
+  const { results } = await db
+    .prepare('SELECT json FROM game_results WHERE profile_id = ? ORDER BY finished_at DESC')
+    .bind(profileId)
+    .all<{ json: string }>();
+  return results.map((r) => JSON.parse(r.json) as GameResult);
 }
 
 async function readJson(
@@ -355,6 +380,79 @@ export async function handleApi(request: Request, deps: ApiDeps): Promise<Respon
       return json({ deleted: id });
     }
     return fail('badRequest', 405);
+  }
+
+  // ---- Statistik ------------------------------------------------------------------------
+  if (path === '/api/stats/claim') {
+    if (method !== 'POST' || !deps.claimSeat) return fail('badRequest', 405);
+    const me = await authenticate(request, deps);
+    if (!me) return fail('unauthorized', 401);
+    const parsed = await readJson(request);
+    if (!parsed.ok) return parsed.error;
+    const { code, token } = parsed.body as { code?: unknown; token?: unknown };
+    if (typeof code !== 'string' || !ROOM_CODE_PATTERN.test(code)) return fail('badRequest', 400);
+    if (typeof token !== 'string' || token.length === 0 || token.length > 200)
+      return fail('badRequest', 400);
+    const seat = await deps.claimSeat(code, token);
+    if (seat === 'notFinished') return fail('notFinished', 409);
+    if (!seat) return fail('notFound', 404);
+
+    const taken = await deps.db
+      .prepare('SELECT profile_id FROM game_results WHERE room_code = ? AND seat_id = ?')
+      .bind(code, seat.seatId)
+      .first();
+    if (taken) return json({ unlocked: [], alreadyClaimed: true } satisfies ClaimResponse);
+
+    const now = deps.now();
+    const result: GameResult = {
+      roomCode: code,
+      packName: seat.packName,
+      finishedAt: now,
+      bots: seat.bots,
+      stats: seat.stats,
+    };
+    await deps.db
+      .prepare(
+        'INSERT INTO game_results (room_code, seat_id, profile_id, finished_at, json) VALUES (?, ?, ?, ?, ?)',
+      )
+      .bind(code, seat.seatId, me, now, JSON.stringify(result))
+      .run();
+    const { results: had } = await deps.db
+      .prepare('SELECT achievement_id FROM achievements WHERE profile_id = ?')
+      .bind(me)
+      .all<{ achievement_id: string }>();
+    const known = new Set(had.map((r) => r.achievement_id));
+    const unlocked = earnedAchievements(await loadResults(deps.db, me)).filter(
+      (id) => !known.has(id),
+    );
+    for (const id of unlocked)
+      await deps.db
+        .prepare(
+          'INSERT INTO achievements (profile_id, achievement_id, unlocked_at) VALUES (?, ?, ?)',
+        )
+        .bind(me, id, now)
+        .run();
+    return json({ unlocked, alreadyClaimed: false } satisfies ClaimResponse, 201);
+  }
+
+  if (path === '/api/stats') {
+    if (method !== 'GET') return fail('badRequest', 405);
+    const me = await authenticate(request, deps);
+    if (!me) return fail('unauthorized', 401);
+    const results = await loadResults(deps.db, me);
+    const { results: achievements } = await deps.db
+      .prepare(
+        'SELECT achievement_id, unlocked_at FROM achievements WHERE profile_id = ? ORDER BY unlocked_at',
+      )
+      .bind(me)
+      .all<{ achievement_id: string; unlocked_at: number }>();
+    const totals = totalsOf(results);
+    return json({
+      totals,
+      title: titleOf(totals.wins),
+      achievements: achievements.map((a) => ({ id: a.achievement_id, unlockedAt: a.unlocked_at })),
+      recent: results.slice(0, 10),
+    } satisfies ProfileStatsResponse);
   }
 
   return null;

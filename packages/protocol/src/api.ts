@@ -66,6 +66,7 @@ export type ApiError =
   | 'invalidRuleSet'
   | 'tooLarge'
   | 'tooMany'
+  | 'notFinished'
   | 'badRequest';
 
 export interface ApiErrorResponse {

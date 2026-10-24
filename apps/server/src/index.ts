@@ -64,6 +64,7 @@ export default {
       db: env.DB as unknown as SqlDatabase,
       now: Date.now,
       images,
+      claimSeat: (code, token) => roomStub(code).claim(token),
     });
     if (api) return api;
 

@@ -1,14 +1,30 @@
 import { standardPack } from '@menelgame/packs';
-import type { PackResponse, PackSummary, ProfileCredentials, RuleSet } from '@menelgame/protocol';
-import { readFileSync } from 'node:fs';
+import type {
+  ClaimResponse,
+  PackResponse,
+  PackSummary,
+  ProfileCredentials,
+  ProfileStatsResponse,
+  RuleSet,
+} from '@menelgame/protocol';
+import { readdirSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { handleApi, serveImage, type ImageStore, type SqlDatabase, type SqlStatement } from './api';
+import {
+  handleApi,
+  serveImage,
+  type ApiDeps,
+  type ImageStore,
+  type SeatResult,
+  type SqlDatabase,
+  type SqlStatement,
+} from './api';
 
 /** D1-ähnliche Hülle um node:sqlite, damit die API ohne Cloudflare testbar ist. */
 function sqliteDb(): SqlDatabase {
   const db = new DatabaseSync(':memory:');
-  db.exec(readFileSync(new URL('../migrations/0001_init.sql', import.meta.url), 'utf8'));
+  const dir = new URL('../migrations/', import.meta.url);
+  for (const file of readdirSync(dir).sort()) db.exec(readFileSync(new URL(file, dir), 'utf8'));
   const statement = (query: string, values: unknown[] = []): SqlStatement => ({
     bind: (...next) => statement(query, next),
     first: async <T>() => (db.prepare(query).get(...(values as never[])) as T | undefined) ?? null,
@@ -19,6 +35,12 @@ function sqliteDb(): SqlDatabase {
 }
 
 let db: SqlDatabase;
+/** Fertige Räume für die Statistik-Tests: Code → Token → Ergebnis. */
+const finishedRooms = new Map<string, Map<string, SeatResult>>();
+const claimSeat: NonNullable<ApiDeps['claimSeat']> = async (code, token) => {
+  if (code === 'LAUFEN') return 'notFinished';
+  return finishedRooms.get(code)?.get(token) ?? null;
+};
 let clock = 1000;
 const stored = new Map<string, { body: ArrayBuffer; contentType: string }>();
 const images: ImageStore = {
@@ -40,7 +62,7 @@ async function call(
     headers,
     ...(options.body !== undefined && { body: JSON.stringify(options.body) }),
   });
-  const response = await handleApi(request, { db, now: () => ++clock, images });
+  const response = await handleApi(request, { db, now: () => ++clock, images, claimSeat });
   if (!response) throw new Error(`Kein Handler für ${path}`);
   return { status: response.status, body: await response.json() };
 }
@@ -243,5 +265,108 @@ describe('Bilder', () => {
     expect((await upload(me, 'text/html', 10)).status).toBe(415);
     expect((await upload(me, 'image/png', 1024 * 1024 + 1)).status).toBe(413);
     expect((await serveImage('/img/../etwas', images)).status).toBe(404);
+  });
+});
+
+describe('Statistik', () => {
+  const stats = (patch: Partial<SeatResult['stats']> = {}): SeatResult['stats'] => ({
+    players: 2,
+    rounds: 30,
+    rank: 1,
+    won: true,
+    bankrupt: false,
+    netWorth: 3000,
+    rentPaid: 400,
+    rentReceived: 2500,
+    propertiesBought: 8,
+    housesBuilt: 9,
+    hotelsBuilt: 2,
+    trades: 1,
+    agreements: 0,
+    jailVisits: 0,
+    doubles: 4,
+    passedStart: 6,
+    completeGroups: 1,
+    ...patch,
+  });
+
+  beforeEach(() => {
+    finishedRooms.clear();
+    finishedRooms.set(
+      'ABCDEF',
+      new Map([
+        ['token-a', { seatId: 's1', packName: 'Neustadt', bots: { hard: 1 }, stats: stats() }],
+        [
+          'token-b',
+          {
+            seatId: 's2',
+            packName: 'Neustadt',
+            bots: {},
+            stats: stats({ won: false, rank: 2, bankrupt: true }),
+          },
+        ],
+      ]),
+    );
+  });
+
+  it('speichert Ergebnisse, schaltet Erfolge frei und vergibt Titel', async () => {
+    const me = await newProfile();
+    const claim = await call('POST', '/api/stats/claim', {
+      auth: me,
+      body: { code: 'ABCDEF', token: 'token-a' },
+    });
+    expect(claim.status).toBe(201);
+    expect((claim.body as ClaimResponse).unlocked).toEqual(
+      expect.arrayContaining([
+        'firstGame',
+        'firstWin',
+        'builder',
+        'landlord',
+        'cleanRecord',
+        'botSlayer',
+      ]),
+    );
+    const again = await call('POST', '/api/stats/claim', {
+      auth: me,
+      body: { code: 'ABCDEF', token: 'token-a' },
+    });
+    expect(again.body).toEqual({ unlocked: [], alreadyClaimed: true });
+
+    const overview = (await call('GET', '/api/stats', { auth: me })).body as ProfileStatsResponse;
+    expect(overview.totals).toMatchObject({
+      games: 1,
+      wins: 1,
+      rentReceived: 2500,
+      hotelsBuilt: 2,
+    });
+    expect(overview.title).toBe('landowner');
+    expect(overview.recent[0]).toMatchObject({ roomCode: 'ABCDEF', packName: 'Neustadt' });
+    expect(overview.achievements.map((a) => a.id)).toContain('botSlayer');
+  });
+
+  it('ein Platz zählt nur für ein Profil', async () => {
+    const first = await newProfile();
+    const second = await newProfile();
+    const body = { code: 'ABCDEF', token: 'token-b' };
+    expect((await call('POST', '/api/stats/claim', { auth: first, body })).status).toBe(201);
+    expect((await call('POST', '/api/stats/claim', { auth: second, body })).body).toEqual({
+      unlocked: [],
+      alreadyClaimed: true,
+    });
+    const overview = (await call('GET', '/api/stats', { auth: second }))
+      .body as ProfileStatsResponse;
+    expect(overview.totals.games).toBe(0);
+  });
+
+  it('prüft Token, Spielende und Profil', async () => {
+    const me = await newProfile();
+    const claim = (body: unknown) => call('POST', '/api/stats/claim', { auth: me, body });
+    expect((await claim({ code: 'ABCDEF', token: 'falsch' })).status).toBe(404);
+    expect((await claim({ code: 'LAUFEN', token: 'token-a' })).status).toBe(409);
+    expect((await claim({ code: 'kaputt', token: 'x' })).status).toBe(400);
+    expect(
+      (await call('POST', '/api/stats/claim', { body: { code: 'ABCDEF', token: 'token-a' } }))
+        .status,
+    ).toBe(401);
   });
 });

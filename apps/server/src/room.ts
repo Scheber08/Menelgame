@@ -7,7 +7,9 @@ import {
   type Action,
   type ApplyResult,
   type GameEvent,
+  playerGameStats,
   type GameState,
+  type PlayerGameStats,
 } from '@menelgame/engine';
 import { builtInPacks, standardPack } from '@menelgame/packs';
 import {
@@ -23,6 +25,7 @@ import {
   type ClientMessage,
   type Deadline,
   type ErrorCode,
+  type GameResult,
   type LobbyCard,
   type LobbyCardRules,
   type RoomView,
@@ -751,4 +754,30 @@ export class Room {
   private error(connId: string, code: ErrorCode): void {
     this.host.send(connId, { t: 'error', code });
   }
+}
+
+/** Was ein Mensch nach Spielende für seine Statistik bekommt. */
+export interface SeatClaim {
+  seatId: string;
+  packName: string;
+  bots: GameResult['bots'];
+  stats: PlayerGameStats;
+}
+
+/** Ergebnis eines Platzes aus dem fertig nachgespielten Spiel. */
+export function seatClaim(
+  data: RoomData,
+  seatId: string,
+  state: GameState,
+  events: readonly GameEvent[],
+): SeatClaim {
+  const bots: GameResult['bots'] = {};
+  for (const seat of data.seats)
+    if (seat.id !== seatId && seat.bot) bots[seat.bot] = (bots[seat.bot] ?? 0) + 1;
+  return {
+    seatId,
+    packName: state.pack.meta.name,
+    bots,
+    stats: playerGameStats(state, events, seatId),
+  };
 }

@@ -36,3 +36,4 @@ export {
   validateTerms,
 } from './agreements';
 export { variableValue } from './effects';
+export { playerGameStats, type PlayerGameStats } from './stats';
