@@ -38,6 +38,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@menelgame/bots':
+        specifier: workspace:*
+        version: link:../../packages/bots
       '@menelgame/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -97,6 +100,19 @@ importers:
       vite:
         specifier: ^7.1.0
         version: 7.3.7(@types/node@22.20.5)
+
+  packages/bots:
+    dependencies:
+      '@menelgame/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@menelgame/schema':
+        specifier: workspace:*
+        version: link:../schema
+    devDependencies:
+      '@menelgame/packs':
+        specifier: workspace:*
+        version: link:../packs
 
   packages/engine:
     dependencies:

@@ -1,0 +1,19 @@
+{
+  "name": "@menelgame/bots",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@menelgame/engine": "workspace:*",
+    "@menelgame/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@menelgame/packs": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}
