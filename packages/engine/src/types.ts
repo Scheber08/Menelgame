@@ -1,4 +1,4 @@
-import type { BoardPack, DiceConfig, Rules } from '@menelgame/schema';
+import type { BoardPack, ChoiceOption, DiceConfig, Rules } from '@menelgame/schema';
 import type { RngState } from './rng';
 
 export type PlayerId = string;
@@ -24,6 +24,8 @@ export interface Player {
   jailFreeCards: JailFreeCardRef[];
   /** Pasch in Folge in diesem Zug. */
   doublesInRow: number;
+  /** So viele Züge setzt der Spieler noch aus. */
+  skipTurns: number;
   bankrupt: boolean;
 }
 
@@ -61,7 +63,9 @@ export type ResumePoint =
   | { kind: 'moveAfterBail'; steps: number }
   | { kind: 'advanceTurn' }
   /** Erst diese Felder versteigern, dann weiter. */
-  | { kind: 'auction'; tiles: string[]; then: ResumePoint };
+  | { kind: 'auction'; tiles: string[]; then: ResumePoint }
+  /** Erst wählen lassen, dann weiter. */
+  | { kind: 'choice'; playerId: PlayerId; options: ChoiceOption[]; then: ResumePoint };
 
 export type Phase =
   | { name: 'awaitingRoll' }
@@ -70,6 +74,8 @@ export type Phase =
   | { name: 'awaitingDebt'; resume: ResumePoint }
   /** Versteigerung läuft; Details in state.auction. Alle aktiven Spieler dürfen bieten. */
   | { name: 'auction' }
+  /** Ein Spieler muss eine Möglichkeit wählen (eigene Feldtypen). */
+  | { name: 'awaitingChoice'; playerId: PlayerId; options: ChoiceOption[]; then: ResumePoint }
   | { name: 'gameOver'; winner: PlayerId | null };
 
 export type PhaseName = Phase['name'];
@@ -122,7 +128,7 @@ export interface Agreement {
   data: Record<string, unknown>;
 }
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
 export interface GameState {
   stateVersion: typeof STATE_VERSION;
@@ -142,6 +148,10 @@ export interface GameState {
   debts: Debt[];
   auction: AuctionState | null;
   trades: TradeOffer[];
+  /** Gesperrte Felder mit verbleibenden Runden. */
+  blockedTiles: Record<string, number>;
+  /** Zug, in dem die Zugende-Regeln schon gelaufen sind (sie laufen nur einmal pro Zug). */
+  turnEndHandled: number;
   nextTradeId: number;
   agreements: Agreement[];
   lastRoll: DiceRoll | null;
@@ -185,7 +195,8 @@ export type PlayerAction =
     }
   | { type: 'ACCEPT_TRADE'; playerId: PlayerId; tradeId: string }
   | { type: 'REJECT_TRADE'; playerId: PlayerId; tradeId: string }
-  | { type: 'CANCEL_TRADE'; playerId: PlayerId; tradeId: string };
+  | { type: 'CANCEL_TRADE'; playerId: PlayerId; tradeId: string }
+  | { type: 'CHOOSE'; playerId: PlayerId; option: number };
 
 /**
  * Aktionen ohne Spieler: Uhr (Auktionsende) und Host-Rechte. Der Server bzw. die
@@ -243,6 +254,14 @@ export type GameEvent =
   | { type: 'tradeRejected'; tradeId: string; by: PlayerId }
   | { type: 'tradeCancelled'; tradeId: string; reason: 'withdrawn' | 'invalid' | 'countered' }
   | { type: 'rulesUpdated'; changes: string[] }
+  | { type: 'tileEffect'; playerId: PlayerId; tileId: string; trigger: string }
+  | { type: 'choiceOffered'; playerId: PlayerId; options: string[] }
+  | { type: 'choiceMade'; playerId: PlayerId; option: number; label: string }
+  | { type: 'tileBlocked'; tileId: string; rounds: number }
+  | { type: 'tileUnblocked'; tileId: string }
+  | { type: 'blockedTileLanded'; playerId: PlayerId; tileId: string }
+  | { type: 'skipTurnsAdded'; playerId: PlayerId; turns: number }
+  | { type: 'turnSkipped'; playerId: PlayerId; remaining: number }
   | { type: 'playerRemoved'; playerId: PlayerId }
   | { type: 'rentDue'; playerId: PlayerId; owner: PlayerId; tileId: string; amount: number }
   | { type: 'noRent'; playerId: PlayerId; tileId: string; why: 'mortgaged' | 'ownerInJail' }
@@ -298,7 +317,8 @@ export type ErrorCode =
   | 'notTradeParty'
   | 'invalidTrade'
   | 'tooManyTrades'
-  | 'invalidRules';
+  | 'invalidRules'
+  | 'unknownOption';
 
 export interface EngineError {
   code: ErrorCode;

@@ -66,6 +66,7 @@ export function createGame(setup: GameSetup): GameState {
     jailAttempts: 0,
     jailFreeCards: [],
     doublesInRow: 0,
+    skipTurns: 0,
     bankrupt: false,
   }));
 
@@ -86,6 +87,8 @@ export function createGame(setup: GameSetup): GameState {
     auction: null,
     trades: [],
     nextTradeId: 1,
+    blockedTiles: {},
+    turnEndHandled: 0,
     agreements: [],
     lastRoll: null,
     round: 1,

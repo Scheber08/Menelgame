@@ -1,7 +1,7 @@
 import { parseBoardPack, type BoardPack, type Tile } from '@menelgame/schema';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EffectEditor } from '../components/EffectEditor';
+import { EffectEditor, effectContext } from '../components/EffectEditor';
 import { NumberField, TextField } from '../components/fields';
 import { PackPreview } from '../components/PackPreview';
 import { RulesForm } from '../components/RulesForm';
@@ -259,7 +259,7 @@ export function PackEditorPage({ id }: { id: string }) {
                         />
                         <EffectEditor
                           effects={card.effects}
-                          tiles={draft.tiles}
+                          context={effectContext(draft)}
                           onChange={(effects) =>
                             setDeck({
                               ...deck,

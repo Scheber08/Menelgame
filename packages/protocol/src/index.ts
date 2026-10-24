@@ -85,6 +85,7 @@ export const ActionInputSchema = z.discriminatedUnion('type', [
   onTrade('ACCEPT_TRADE'),
   onTrade('REJECT_TRADE'),
   onTrade('CANCEL_TRADE'),
+  z.object({ type: z.literal('CHOOSE'), option: z.int().min(0).max(3) }),
 ]);
 
 export type ActionInput = z.infer<typeof ActionInputSchema>;

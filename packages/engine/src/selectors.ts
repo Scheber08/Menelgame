@@ -28,6 +28,7 @@ export function currentPlayer(state: GameState): Player {
 /** Wer jetzt handeln darf: bei offenen Schulden der Schuldner, sonst der Spieler am Zug. */
 export function actingPlayerId(state: GameState): PlayerId {
   if (state.phase.name === 'awaitingDebt' && state.debts[0]) return state.debts[0].debtor;
+  if (state.phase.name === 'awaitingChoice') return state.phase.playerId;
   return currentPlayer(state).id;
 }
 

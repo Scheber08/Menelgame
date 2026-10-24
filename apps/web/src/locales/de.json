@@ -69,7 +69,8 @@
     "gameOver": "Das Spiel ist vorbei.",
     "manageHint": "Tipp: Klicke ein eigenes Feld an, um zu bauen oder eine Hypothek aufzunehmen.",
     "auction": "Versteigerung läuft – alle dürfen bieten.",
-    "waitingFor": "Warte auf {{name}} …"
+    "waitingFor": "Warte auf {{name}} …",
+    "awaitingChoice": "{{name}} wählt:"
   },
   "actions": {
     "ROLL_DICE": "Würfeln",
@@ -131,8 +132,11 @@
       "card": "Karte",
       "jail": "Gefängnis / nur zu Besuch",
       "goToJail": "Ab ins Gefängnis",
-      "freeParking": "Frei Parken"
-    }
+      "freeParking": "Frei Parken",
+      "custom": "Eigener Feldtyp"
+    },
+    "blocked": "gesperrt",
+    "rules": "Wirkung"
   },
   "center": {
     "lastCard": "Zuletzt gezogen",
@@ -206,7 +210,17 @@
     "tradeCancelled_invalid": "Ein Angebot ist hinfällig geworden",
     "tradeMoney": "{{from}} zahlt {{amount}} an {{to}} (Handel)",
     "rulesUpdated": "Der Host ändert die Regeln: {{changes}}",
-    "playerRemoved": "{{player}} wurde aus dem Spiel entfernt"
+    "playerRemoved": "{{player}} wurde aus dem Spiel entfernt",
+    "tileEffect": "{{tile}} wirkt",
+    "choiceOffered": "{{player}} muss wählen",
+    "choiceMade": "{{player}} wählt „{{label}}“",
+    "tileBlocked_one": "{{tile}} ist {{count}} Runde gesperrt",
+    "tileBlocked_other": "{{tile}} ist {{count}} Runden gesperrt",
+    "tileUnblocked": "{{tile}} ist wieder frei",
+    "blockedTileLanded": "{{tile}} ist gesperrt – nichts passiert",
+    "skipTurnsAdded_one": "{{player}} muss {{count}} Zug aussetzen",
+    "skipTurnsAdded_other": "{{player}} muss {{count}} Züge aussetzen",
+    "turnSkipped": "{{player}} setzt aus"
   },
   "gameOver": {
     "heading": "{{winner}} gewinnt!",
@@ -263,7 +277,8 @@
     "kicked": "Du wurdest vom Host entfernt.",
     "invalidPack": "Das Pack ist ungültig.",
     "lobbyCardsDisabled": "Lobby-Karten sind ausgeschaltet.",
-    "lobbyCardTooExpensive": "Ein Betrag liegt über dem Limit des Hosts."
+    "lobbyCardTooExpensive": "Ein Betrag liegt über dem Limit des Hosts.",
+    "unknownOption": "Diese Möglichkeit gibt es nicht."
   },
   "ruleNames": {
     "startingCash": "Startgeld",
@@ -508,7 +523,13 @@
     "moveToNearest": "Zum nächsten …",
     "goToJail": "Ins Gefängnis",
     "jailFreeCard": "Gefängnis-frei-Karte",
-    "repairs": "Renovierung"
+    "repairs": "Renovierung",
+    "payPercent": "Prozent zahlen",
+    "moveToNextOfType": "Zum nächsten Feld eines Typs",
+    "drawCard": "Karte ziehen",
+    "blockTile": "Feld sperren",
+    "skipTurns": "Aussetzen",
+    "choice": "Auswahl anbieten"
   },
   "ruleSets": {
     "namePrompt": "Name für das Regelset:",
@@ -538,5 +559,48 @@
     "saved": "Gespeichert",
     "count_one": "{{count}} Karte",
     "count_other": "{{count}} Karten"
+  },
+  "describe": {
+    "collect": "erhalte {{amount}}",
+    "pay": "zahle {{amount}}",
+    "collectFromEach": "erhalte {{amount}} von jedem",
+    "payEach": "zahle jedem {{amount}}",
+    "payPercent": "zahle {{percent}} % deines Bargelds",
+    "moveTo": "ziehe auf {{tile}}",
+    "moveBy_one": "ziehe {{count}} Feld vor",
+    "moveBy_other": "ziehe {{count}} Felder vor",
+    "moveBack_one": "gehe {{count}} Feld zurück",
+    "moveBack_other": "gehe {{count}} Felder zurück",
+    "moveToNext": "weiter zum nächsten Feld „{{type}}“",
+    "goToJail": "ab ins Gefängnis",
+    "jailFreeCard": "Gefängnis-frei-Karte",
+    "repairs": "zahle {{house}} pro Haus und {{hotel}} pro Hotel",
+    "drawCard": "ziehe eine Karte „{{deck}}“",
+    "blockTile_one": "Feld {{count}} Runde sperren",
+    "blockTile_other": "Feld {{count}} Runden sperren",
+    "skipTurns_one": "{{count}} Zug aussetzen",
+    "skipTurns_other": "{{count}} Züge aussetzen",
+    "choice": "wähle: {{options}}",
+    "cash_lt": "Bargeld unter {{amount}}",
+    "cash_gte": "Bargeld ab {{amount}}",
+    "dice_eq": "Wurf genau {{value}}",
+    "dice_lt": "Wurf unter {{value}}",
+    "dice_gte": "Wurf ab {{value}}",
+    "double": "bei Pasch",
+    "noDouble": "ohne Pasch",
+    "buildings_lt": "weniger als {{count}} Gebäude",
+    "buildings_gte": "mindestens {{count}} Gebäude",
+    "chance": "mit {{percent}} % Wahrscheinlichkeit",
+    "ownsGroup": "wer „{{group}}“ ganz besitzt",
+    "rule": "{{when}}: {{effects}}",
+    "ruleIf": "{{when}}, wenn {{conditions}}: {{effects}}",
+    "and": " und "
+  },
+  "triggers": {
+    "land": "Beim Betreten",
+    "pass": "Beim Überqueren",
+    "turnStart": "Zu Zugbeginn",
+    "turnEnd": "Zum Zugende",
+    "roundEnd": "Am Rundenende"
   }
 }

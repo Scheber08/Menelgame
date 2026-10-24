@@ -187,3 +187,83 @@ describe('Bot-Entscheidungen', () => {
     expect(decideBot(state, 'p1', 'medium')).toEqual({ type: 'ROLL_DICE', playerId: 'p1' });
   });
 });
+
+describe('Bots auf Brettern mit eigenen Feldtypen', () => {
+  it('spielen ohne Hänger auf einem Brett mit Teleportern, Auswahl und Aussetzen', () => {
+    const pack = structuredClone(standardPack);
+    pack.tileTypes = [
+      {
+        id: 'teleporter',
+        name: 'Teleporter',
+        color: '#7c3aed',
+        rules: [
+          {
+            trigger: 'land',
+            conditions: [],
+            effects: [
+              { kind: 'moveToNextOfType', tileType: 'teleporter', passTiles: false, land: false },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'kreuzung',
+        name: 'Kreuzung',
+        color: '#0088aa',
+        rules: [
+          {
+            trigger: 'land',
+            conditions: [],
+            effects: [
+              {
+                kind: 'choice',
+                options: [
+                  { label: 'Geld', effects: [{ kind: 'collect', amount: 50 }] },
+                  {
+                    label: 'Aussetzen',
+                    effects: [
+                      { kind: 'skipTurns', turns: 1 },
+                      { kind: 'collect', amount: 200 },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    pack.tiles = pack.tiles.map((t) =>
+      t.id === 'grundsteuer' || t.id === 'luxusabgabe'
+        ? { id: t.id, name: 'Teleporter', type: 'custom' as const, tileType: 'teleporter' }
+        : t.id === 'glueck-2'
+          ? { id: t.id, name: 'Kreuzung', type: 'custom' as const, tileType: 'kreuzung' }
+          : t,
+    );
+    for (const seed of [41, 42, 43]) {
+      const initial = createGame({
+        pack,
+        seed,
+        players: ['p1', 'p2', 'p3'].map((id) => ({ id, name: id, color: '#000000' })),
+      });
+      let state = initial;
+      const memories = new Map(state.players.map((p) => [p.id, newBotMemory()]));
+      let steps = 0;
+      while (state.phase.name !== 'gameOver' && steps++ < 40_000) {
+        const acting = actingPlayerId(state);
+        const order = [acting, ...state.players.map((p) => p.id).filter((id) => id !== acting)];
+        let action: Action | null = null;
+        for (const id of order) {
+          action = decideBot(state, id, id === 'p2' ? 'easy' : 'medium', memories.get(id));
+          if (action) break;
+        }
+        action ??= state.phase.name === 'auction' ? { type: 'AUCTION_CLOSE' } : null;
+        if (!action) throw new Error(`Hänger in ${state.phase.name}`);
+        const result = apply(state, action);
+        if (!result.ok) throw new Error(`${action.type}: ${result.error.code}`);
+        state = result.state;
+      }
+      expect(state.phase.name).toBe('gameOver');
+    }
+  });
+});

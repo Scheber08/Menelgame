@@ -1,4 +1,5 @@
 import type { GameEvent, GameState, Party } from '@menelgame/engine';
+import type { BoardPack, Condition, Effect, TileRule } from '@menelgame/schema';
 import type { TFunction } from 'i18next';
 
 const numberFormat = new Intl.NumberFormat('de-DE');
@@ -140,6 +141,22 @@ export function formatEvent(t: TFunction, state: GameState, event: GameEvent): s
       });
     case 'playerRemoved':
       return t('events.playerRemoved', { player: name(event.playerId) });
+    case 'tileEffect':
+      return t('events.tileEffect', { tile: tileName(state, event.tileId) });
+    case 'choiceOffered':
+      return t('events.choiceOffered', { player: name(event.playerId) });
+    case 'choiceMade':
+      return t('events.choiceMade', { player: name(event.playerId), label: event.label });
+    case 'tileBlocked':
+      return t('events.tileBlocked', { tile: tileName(state, event.tileId), count: event.rounds });
+    case 'tileUnblocked':
+      return t('events.tileUnblocked', { tile: tileName(state, event.tileId) });
+    case 'blockedTileLanded':
+      return t('events.blockedTileLanded', { tile: tileName(state, event.tileId) });
+    case 'skipTurnsAdded':
+      return t('events.skipTurnsAdded', { player: name(event.playerId), count: event.turns });
+    case 'turnSkipped':
+      return t('events.turnSkipped', { player: name(event.playerId) });
     case 'rentDue':
       return null;
     case 'noRent':
@@ -230,4 +247,83 @@ export function buildingsLabel(t: TFunction, buildings: number): string {
   return buildings >= 5
     ? t('events.buildingsHotel')
     : t('events.buildingsHouses', { count: buildings });
+}
+
+/** Name eines Feldtyps (eingebaut oder eigen) für Texte. */
+export function tileTypeName(t: TFunction, pack: BoardPack, type: string): string {
+  return (
+    pack.tileTypes.find((x) => x.id === type)?.name ??
+    t(`tile.types.${type}`, { defaultValue: type })
+  );
+}
+
+/** Kurzbeschreibung einer festen Aktion, z. B. „Zahle 50 Taler“. */
+export function describeEffect(t: TFunction, pack: BoardPack, effect: Effect): string {
+  const money = (n: number) => formatMoney(t, n);
+  const tile = (id: string) => pack.tiles.find((x) => x.id === id)?.name ?? id;
+  switch (effect.kind) {
+    case 'collect':
+    case 'pay':
+    case 'collectFromEach':
+    case 'payEach':
+      return t(`describe.${effect.kind}`, { amount: money(effect.amount) });
+    case 'payPercent':
+      return t('describe.payPercent', { percent: effect.percent });
+    case 'moveTo':
+      return t('describe.moveTo', { tile: tile(effect.tile) });
+    case 'moveBy':
+      return t(effect.steps < 0 ? 'describe.moveBack' : 'describe.moveBy', {
+        count: Math.abs(effect.steps),
+      });
+    case 'moveToNearest':
+    case 'moveToNextOfType':
+      return t('describe.moveToNext', { type: tileTypeName(t, pack, effect.tileType) });
+    case 'goToJail':
+      return t('describe.goToJail');
+    case 'jailFreeCard':
+      return t('describe.jailFreeCard');
+    case 'repairs':
+      return t('describe.repairs', {
+        house: money(effect.perHouse),
+        hotel: money(effect.perHotel),
+      });
+    case 'drawCard':
+      return t('describe.drawCard', {
+        deck: pack.decks.find((d) => d.id === effect.deck)?.name ?? effect.deck,
+      });
+    case 'blockTile':
+      return t('describe.blockTile', { count: effect.rounds });
+    case 'skipTurns':
+      return t('describe.skipTurns', { count: effect.turns });
+    case 'choice':
+      return t('describe.choice', { options: effect.options.map((o) => o.label).join(' / ') });
+  }
+}
+
+export function describeCondition(t: TFunction, pack: BoardPack, c: Condition): string {
+  switch (c.kind) {
+    case 'cash':
+      return t(`describe.cash_${c.op}`, { amount: formatMoney(t, c.amount) });
+    case 'diceTotal':
+      return t(`describe.dice_${c.op}`, { value: c.value });
+    case 'double':
+      return t(c.value ? 'describe.double' : 'describe.noDouble');
+    case 'buildings':
+      return t(`describe.buildings_${c.op}`, { count: c.count });
+    case 'chance':
+      return t('describe.chance', { percent: c.percent });
+    case 'ownsGroup':
+      return t('describe.ownsGroup', {
+        group: pack.groups.find((g) => g.id === c.group)?.name ?? c.group,
+      });
+  }
+}
+
+export function describeRule(t: TFunction, pack: BoardPack, rule: TileRule): string {
+  const when = t(`triggers.${rule.trigger}`);
+  const conditions = rule.conditions.map((c) => describeCondition(t, pack, c));
+  const effects = rule.effects.map((e) => describeEffect(t, pack, e)).join(', ');
+  return conditions.length > 0
+    ? t('describe.ruleIf', { when, conditions: conditions.join(t('describe.and')), effects })
+    : t('describe.rule', { when, effects });
 }

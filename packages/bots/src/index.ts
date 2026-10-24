@@ -10,7 +10,8 @@ import {
 import { easy } from './easy';
 import { medium } from './medium';
 import { find, settleDebt, type Strategy } from './strategy';
-import { botView, newBotMemory, type BotMemory } from './view';
+import { estimateEffects } from './valuation';
+import { botView, chance, newBotMemory, type BotMemory } from './view';
 
 export { botView, newBotMemory, type BotMemory } from './view';
 export { cashReserve, tileWorth } from './valuation';
@@ -75,6 +76,23 @@ export function decideBot(
     case 'awaitingDebt':
       choice = settleDebt(view, playerId, legal);
       break;
+    case 'awaitingChoice': {
+      const options = view.phase.options;
+      // Mittel nimmt die Möglichkeit mit dem besten geschätzten Geldwert, Leicht würfelt.
+      const option =
+        level === 'medium'
+          ? options.reduce(
+              (best, o, i) =>
+                estimateEffects(view, playerId, o.effects) >
+                estimateEffects(view, playerId, options[best]!.effects)
+                  ? i
+                  : best,
+              0,
+            )
+          : Math.floor(chance(view, playerId, 'choice') * options.length);
+      choice = { type: 'CHOOSE', playerId, option };
+      break;
+    }
   }
   if (valid(choice)) return choice;
   // Rückfall: das Erste, was sicher geht.

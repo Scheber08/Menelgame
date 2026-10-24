@@ -1,5 +1,6 @@
 import {
   activePlayers,
+  buildingCounts,
   calculateRent,
   groupTiles,
   ownedCountInGroup,
@@ -7,7 +8,7 @@ import {
   type PlayerId,
   type TradeBundle,
 } from '@menelgame/engine';
-import { isOwnable, mortgageValueOf, type OwnableTile } from '@menelgame/schema';
+import { isOwnable, mortgageValueOf, type BaseEffect, type OwnableTile } from '@menelgame/schema';
 
 export function cashOf(state: GameState, playerId: PlayerId): number {
   return state.players.find((p) => p.id === playerId)?.cash ?? 0;
@@ -85,4 +86,50 @@ export function bundleWorth(
 /** Summe der Grundstückspreise einer Gruppe. */
 export function groupPrice(state: GameState, groupId: string): number {
   return groupTiles(state, groupId).reduce((sum, t) => sum + t.price, 0);
+}
+
+/** Grobe Geldwirkung fester Aktionen für einen Spieler (für Auswahlen). */
+export function estimateEffects(
+  state: GameState,
+  me: PlayerId,
+  effects: readonly BaseEffect[],
+): number {
+  const others = activePlayers(state).length - 1;
+  const cash = cashOf(state, me);
+  const { houses, hotels } = buildingCounts(state, me);
+  let value = 0;
+  for (const e of effects) {
+    switch (e.kind) {
+      case 'collect':
+        value += e.amount;
+        break;
+      case 'pay':
+        value -= e.amount;
+        break;
+      case 'collectFromEach':
+        value += e.amount * others;
+        break;
+      case 'payEach':
+        value -= e.amount * others;
+        break;
+      case 'payPercent':
+        value -= Math.floor((cash * e.percent) / 100);
+        break;
+      case 'repairs':
+        value -= houses * e.perHouse + hotels * e.perHotel;
+        break;
+      case 'goToJail':
+        value -= 100;
+        break;
+      case 'skipTurns':
+        value -= 80 * e.turns;
+        break;
+      case 'jailFreeCard':
+        value += 50;
+        break;
+      default:
+        break;
+    }
+  }
+  return value;
 }

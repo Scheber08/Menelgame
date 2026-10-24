@@ -5,3 +5,4 @@ import standardJson from './standard.json';
 export const standardPack: BoardPack = BoardPackSchema.parse(standardJson);
 
 export const builtInPacks: readonly BoardPack[] = [standardPack];
+export { randomizeBoard } from './generator';

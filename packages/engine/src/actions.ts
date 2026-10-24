@@ -2,7 +2,14 @@ import { mortgageValueOf, type OwnableTile, type PropertyTile } from '@menelgame
 import { auctionHandlers, startAuctions } from './auction';
 import { declareBankruptcy } from './bankruptcy';
 import { charge, emit, transfer, type Ctx } from './context';
-import { moveForward, sendToJail, startResolution } from './effects';
+import {
+  hasRules,
+  moveForward,
+  runCustomRules,
+  runEffects,
+  sendToJail,
+  startResolution,
+} from './effects';
 import { engineError, type ActionHandler } from './handler';
 import { hostHandlers } from './host';
 import { nextInt } from './rng';
@@ -15,11 +22,12 @@ import {
   ownableById,
   ownsWholeGroup,
   requirePlayer,
+  tileAt,
   tileState,
   unmortgageCost,
 } from './selectors';
 import { tradeHandlers } from './trade';
-import { advanceTurn, finishMovement, resume, settle } from './turn';
+import { advanceTurn, extraRollOf, finishMovement, resume, settle, withChoice } from './turn';
 import {
   isPlayerAction,
   type Action,
@@ -147,7 +155,62 @@ const handlers: { [T in ActionType]: ActionHandler<T> } = {
       state.phase.name === 'freePhase' && state.phase.extraRoll
         ? engineError('mustRollAgain')
         : null,
-    execute: (ctx) => advanceTurn(ctx),
+    execute: (ctx) => {
+      const state = ctx.state;
+      const p = currentPlayer(state);
+      const tile = tileAt(state, p.position);
+      // Zugende-Regeln eigener Feldtypen laufen einmal pro Zug.
+      if (
+        state.turnEndHandled !== state.turn &&
+        tile.type === 'custom' &&
+        !state.blockedTiles[tile.id] &&
+        hasRules(ctx, tile, 'turnEnd')
+      ) {
+        state.turnEndHandled = state.turn;
+        const r = startResolution(ctx, p.id);
+        runCustomRules(r, tile, 'turnEnd');
+        if (r.offer || r.choice || state.debts.length > 0) {
+          settle(
+            ctx,
+            withChoice(
+              r,
+              r.offer
+                ? { kind: 'awaitingPurchase', tileId: r.offer, extraRoll: false }
+                : { kind: 'freePhase', extraRoll: false },
+            ),
+          );
+          return;
+        }
+      }
+      advanceTurn(ctx);
+    },
+  },
+
+  CHOOSE: {
+    phases: ['awaitingChoice'],
+    validate: (state, action) => {
+      const phase = state.phase as Extract<Phase, { name: 'awaitingChoice' }>;
+      return Number.isInteger(action.option) && phase.options[action.option]
+        ? null
+        : engineError('unknownOption');
+    },
+    execute: (ctx, action) => {
+      const phase = ctx.state.phase as Extract<Phase, { name: 'awaitingChoice' }>;
+      const option = phase.options[action.option]!;
+      emit(ctx, {
+        type: 'choiceMade',
+        playerId: action.playerId,
+        option: action.option,
+        label: option.label,
+      });
+      const r = startResolution(ctx, action.playerId);
+      runEffects(r, option.effects);
+      let next = phase.then;
+      if (r.jailed && next.kind === 'freePhase') next = { kind: 'freePhase', extraRoll: false };
+      if (r.offer)
+        next = { kind: 'awaitingPurchase', tileId: r.offer, extraRoll: extraRollOf(next) };
+      settle(ctx, next);
+    },
   },
 
   PAY_BAIL: {

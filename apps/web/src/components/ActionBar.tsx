@@ -22,6 +22,7 @@ interface ActionBarProps {
 
 /** Aktionen des handelnden Spieler, die nicht an ein Feld gebunden sind. */
 const GLOBAL_ACTIONS: Action['type'][] = [
+  'CHOOSE',
   'ROLL_DICE',
   'BUY',
   'DECLINE',
@@ -61,6 +62,9 @@ export function ActionBar({ state, legal, canAct, error, dispatch, turnDeadline 
     case 'auction':
       hint = t('turn.auction');
       break;
+    case 'awaitingChoice':
+      hint = t('turn.awaitingChoice', { name: actor.name });
+      break;
     case 'awaitingDebt':
       hint = debt
         ? t('turn.awaitingDebt', {
@@ -86,6 +90,10 @@ export function ActionBar({ state, legal, canAct, error, dispatch, turnDeadline 
         return t('actions.PAY_BAIL', { amount: money(state.rules.jail.bail) });
       case 'PAY_DEBT':
         return t('actions.PAY_DEBT', { amount: money(debt?.amount ?? 0) });
+      case 'CHOOSE':
+        return phase.name === 'awaitingChoice'
+          ? (phase.options[action.option]?.label ?? String(action.option))
+          : '';
       default:
         return t(`actions.${action.type}`);
     }
@@ -128,10 +136,10 @@ export function ActionBar({ state, legal, canAct, error, dispatch, turnDeadline 
         <div className="action-buttons">
           {visible.map((action) => (
             <button
-              key={action.type}
+              key={action.type === 'CHOOSE' ? `choose-${action.option}` : action.type}
               type="button"
               className={
-                action.type === primary
+                action.type === primary && action.type !== 'CHOOSE'
                   ? 'primary'
                   : action.type === 'DECLARE_BANKRUPTCY'
                     ? 'danger'

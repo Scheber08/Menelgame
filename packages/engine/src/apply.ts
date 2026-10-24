@@ -56,6 +56,11 @@ export function getLegalActions(
   if (state.auction) {
     candidates.push({ type: 'AUCTION_BID', playerId, amount: state.auction.highestBid + 1 });
   }
+  if (state.phase.name === 'awaitingChoice') {
+    state.phase.options.forEach((_, option) =>
+      candidates.push({ type: 'CHOOSE', playerId, option }),
+    );
+  }
   for (const tile of state.pack.tiles) {
     if (!isOwnable(tile) || state.tiles[tile.id]?.owner !== playerId) continue;
     for (const type of ['BUILD', 'SELL_BUILDING', 'MORTGAGE', 'UNMORTGAGE'] as const) {
@@ -82,6 +87,8 @@ export function getDefaultAction(state: GameState): Action | null {
       return null;
     case 'auction':
       return { type: 'AUCTION_CLOSE' };
+    case 'awaitingChoice':
+      return { type: 'CHOOSE', playerId: state.phase.playerId, option: 0 };
   }
   const legal = getLegalActions(state);
   const find = (...types: PlayerActionType[]) =>

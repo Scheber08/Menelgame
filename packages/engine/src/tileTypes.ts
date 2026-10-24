@@ -1,4 +1,4 @@
-import type { Effect, Tile, TileOfType, TileType } from '@menelgame/schema';
+import type { Effect, Tile, TileOfType, TileType, Trigger } from '@menelgame/schema';
 import type { JailReason } from './types';
 
 /** Zusatzwirkungen beim Landen, z. B. von Karten („zahle doppelte Miete“). */
@@ -8,18 +8,18 @@ export interface LandingModifiers {
 }
 
 /**
- * Alle Effekte, die der Interpreter kennt: die festen Kartenaktionen aus dem Schema plus
- * eingebaute Effekte, die Feldtypen erzeugen. Eigene Feldtypen (Phase 5) liefern ebenfalls
- * nur solche Effekte.
+ * Alle Effekte, die der Interpreter kennt: die festen Aktionen aus dem Schema plus
+ * eingebaute Effekte, die Feldtypen erzeugen. Eigene Feldtypen liefern `customRules`, deren
+ * Regeln wiederum nur feste Aktionen enthalten.
  */
 export type EngineEffect =
   | Effect
   | { kind: 'startBonus'; landed: boolean }
   | { kind: 'landOnOwnable'; tileId: string; modifiers: LandingModifiers }
-  | { kind: 'drawCard'; deck: string }
   | { kind: 'tax'; amount: number }
   | { kind: 'collectPot' }
-  | { kind: 'sendToJail'; reason: JailReason };
+  | { kind: 'sendToJail'; reason: JailReason }
+  | { kind: 'customRules'; tileId: string; trigger: Trigger };
 
 export interface TileTypeHandler<T extends Tile = Tile> {
   /** Spieler beendet seine Bewegung auf dem Feld („betreten“). */
@@ -37,8 +37,8 @@ const ownable = {
 };
 
 /**
- * Eingebaute Feldtypen. Sie beschreiben ihr Verhalten nur über Effekte; die Engine
- * selbst kennt keine konkreten Felder.
+ * Feldtypen. Sie beschreiben ihr Verhalten nur über Effekte; die Engine selbst kennt keine
+ * konkreten Felder. Eigene Feldtypen aus dem Pack laufen über denselben Mechanismus.
  */
 export const builtInTileTypes: Registry = {
   start: {
@@ -53,6 +53,10 @@ export const builtInTileTypes: Registry = {
   jail: {},
   goToJail: { onLand: () => [{ kind: 'sendToJail', reason: 'tile' }] },
   freeParking: { onLand: () => [{ kind: 'collectPot' }] },
+  custom: {
+    onLand: (tile) => [{ kind: 'customRules', tileId: tile.id, trigger: 'land' }],
+    onPass: (tile) => [{ kind: 'customRules', tileId: tile.id, trigger: 'pass' }],
+  },
 };
 
 export function tileHandler(tile: Tile): TileTypeHandler {

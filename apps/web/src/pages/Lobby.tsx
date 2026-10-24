@@ -303,7 +303,7 @@ function LobbyCardsPanel({
               />
               <EffectEditor
                 effects={card.effects as Effect[]}
-                tiles={tiles}
+                context={{ tiles, decks: [], tileTypes: [] }}
                 kinds={LOBBY_EFFECT_KINDS}
                 maxAmount={rules.maxAmount}
                 maxEffects={3}

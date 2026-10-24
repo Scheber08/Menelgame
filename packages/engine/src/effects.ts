@@ -1,9 +1,12 @@
+import type { ChoiceOption, Condition, CustomTile, Trigger } from '@menelgame/schema';
 import { charge, emit, finesRecipient, transfer, type Ctx } from './context';
 import { calculateRent } from './rent';
+import { nextFloat } from './rng';
 import {
   activePlayers,
   buildingCounts,
   getPlayer,
+  ownsWholeGroup,
   jailIndex,
   ownableById,
   requirePlayer,
@@ -18,19 +21,25 @@ import type { JailReason, Player, PlayerId } from './types';
 const MAX_LANDINGS = 16;
 
 /**
- * Auflösung der Bewegung eines Spielers. Sammelt, ob ein Kaufangebot entsteht und ob der
- * Spieler ins Gefängnis musste; beides beendet die Kette.
+ * Auflösung der Bewegung eines Spielers. Sammelt, ob ein Kaufangebot entsteht, ob der
+ * Spieler ins Gefängnis musste und ob er etwas wählen soll; Gefängnis und Auswahl beenden
+ * die Kette.
  */
 export interface Resolution {
   ctx: Ctx;
   playerId: PlayerId;
   offer: string | null;
   jailed: boolean;
+  choice: ChoiceOption[] | null;
   landings: number;
 }
 
 export function startResolution(ctx: Ctx, playerId: PlayerId): Resolution {
-  return { ctx, playerId, offer: null, jailed: false, landings: 0 };
+  return { ctx, playerId, offer: null, jailed: false, choice: null, landings: 0 };
+}
+
+function stopped(r: Resolution): boolean {
+  return r.jailed || r.choice !== null;
 }
 
 function player(r: Resolution): Player {
@@ -39,7 +48,7 @@ function player(r: Resolution): Player {
 
 export function runEffects(r: Resolution, effects: readonly EngineEffect[]): void {
   for (const effect of effects) {
-    if (r.jailed) return;
+    if (stopped(r)) return;
     runEffect(r, effect);
   }
 }
@@ -109,6 +118,81 @@ function runEffect(r: Resolution, effect: EngineEffect): void {
       if (state.rules.freeParkingPot)
         transfer(ctx, 'pot', r.playerId, state.freeParkingPot, 'freeParking');
       return;
+    case 'payPercent': {
+      const amount = Math.floor((player(r).cash * effect.percent) / 100);
+      charge(ctx, r.playerId, finesRecipient(ctx), amount, 'card');
+      return;
+    }
+    case 'moveToNextOfType':
+      moveToNextOfType(r, effect.tileType, effect.passTiles, effect.land);
+      return;
+    case 'blockTile': {
+      const tile = tileAt(state, player(r).position);
+      state.blockedTiles[tile.id] = effect.rounds;
+      emit(ctx, { type: 'tileBlocked', tileId: tile.id, rounds: effect.rounds });
+      return;
+    }
+    case 'skipTurns':
+      player(r).skipTurns += effect.turns;
+      emit(ctx, { type: 'skipTurnsAdded', playerId: r.playerId, turns: effect.turns });
+      return;
+    case 'choice':
+      r.choice = effect.options;
+      emit(ctx, {
+        type: 'choiceOffered',
+        playerId: r.playerId,
+        options: effect.options.map((o) => o.label),
+      });
+      return;
+    case 'customRules': {
+      const tile = state.pack.tiles.find((t) => t.id === effect.tileId);
+      if (tile?.type === 'custom') runCustomRules(r, tile, effect.trigger);
+      return;
+    }
+  }
+}
+
+/** Hat ein eigener Feldtyp Regeln für diesen Auslöser? */
+export function hasRules(r: Resolution | Ctx, tile: CustomTile, trigger: Trigger): boolean {
+  const state = 'ctx' in r ? r.ctx.state : r.state;
+  const type = state.pack.tileTypes.find((t) => t.id === tile.tileType);
+  return type?.rules.some((rule) => rule.trigger === trigger) ?? false;
+}
+
+/** Regeln eines eigenen Feldtyps: Bedingungen prüfen, dann die Aktionen ausführen. */
+export function runCustomRules(r: Resolution, tile: CustomTile, trigger: Trigger): void {
+  const state = r.ctx.state;
+  const type = state.pack.tileTypes.find((t) => t.id === tile.tileType);
+  if (!type) return;
+  for (const rule of type.rules) {
+    if (stopped(r)) return;
+    if (rule.trigger !== trigger || !rule.conditions.every((c) => conditionHolds(r, c))) continue;
+    emit(r.ctx, { type: 'tileEffect', playerId: r.playerId, tileId: tile.id, trigger });
+    runEffects(r, rule.effects);
+  }
+}
+
+function conditionHolds(r: Resolution, condition: Condition): boolean {
+  const state = r.ctx.state;
+  const p = player(r);
+  const cmp = (value: number, op: 'lt' | 'gte' | 'eq', target: number) =>
+    op === 'lt' ? value < target : op === 'gte' ? value >= target : value === target;
+  switch (condition.kind) {
+    case 'cash':
+      return cmp(p.cash, condition.op, condition.amount);
+    case 'diceTotal':
+      return cmp(state.lastRoll?.total ?? 0, condition.op, condition.value);
+    case 'double':
+      return (state.lastRoll?.isDouble ?? false) === condition.value;
+    case 'buildings': {
+      const { houses, hotels } = buildingCounts(state, p.id);
+      return cmp(houses + hotels * 5, condition.op, condition.count);
+    }
+    case 'chance':
+      // Über den Spiel-Zufallsgenerator, damit das Replay dasselbe Ergebnis liefert.
+      return nextFloat(state.rng) * 100 < condition.percent;
+    case 'ownsGroup':
+      return ownsWholeGroup(state, p.id, condition.group);
   }
 }
 
@@ -117,6 +201,10 @@ export function landOnCurrentTile(r: Resolution, modifiers: LandingModifiers = {
   if (r.landings >= MAX_LANDINGS) return;
   r.landings++;
   const tile = tileAt(r.ctx.state, player(r).position);
+  if (r.ctx.state.blockedTiles[tile.id]) {
+    emit(r.ctx, { type: 'blockedTileLanded', playerId: r.playerId, tileId: tile.id });
+    return;
+  }
   const effects = tileHandler(tile).onLand?.(tile, modifiers) ?? [];
   runEffects(r, effects);
 }
@@ -130,12 +218,12 @@ export function moveForward(r: Resolution, steps: number, modifiers: LandingModi
   const to = (from + steps) % n;
   p.position = to;
   emit(r.ctx, { type: 'moved', playerId: p.id, from, to, steps });
-  for (let i = 1; i < steps && !r.jailed; i++) {
+  for (let i = 1; i < steps && !stopped(r); i++) {
     const tile = tileAt(state, (from + i) % n);
     const onPass = tileHandler(tile).onPass;
-    if (onPass) runEffects(r, onPass(tile));
+    if (onPass && !state.blockedTiles[tile.id]) runEffects(r, onPass(tile));
   }
-  if (!r.jailed) landOnCurrentTile(r, modifiers);
+  if (!stopped(r)) landOnCurrentTile(r, modifiers);
 }
 
 function moveBy(r: Resolution, steps: number): void {
@@ -174,6 +262,28 @@ function moveToNearest(r: Resolution, type: string, modifiers: LandingModifiers)
       moveForward(r, k, modifiers);
       return;
     }
+  }
+}
+
+/** Zum nächsten Feld eines eingebauten oder eigenen Typs, z. B. Teleporter. */
+function moveToNextOfType(r: Resolution, type: string, passTiles: boolean, land: boolean): void {
+  const state = r.ctx.state;
+  const n = state.pack.tiles.length;
+  const p = player(r);
+  const from = p.position;
+  for (let k = 1; k < n; k++) {
+    const tile = tileAt(state, (from + k) % n);
+    const matches = tile.type === type || (tile.type === 'custom' && tile.tileType === type);
+    if (!matches) continue;
+    if (passTiles) {
+      // Zieht regulär; das Zielfeld wird dabei immer ausgelöst.
+      moveForward(r, k);
+      return;
+    }
+    p.position = (from + k) % n;
+    emit(r.ctx, { type: 'teleported', playerId: p.id, from, to: p.position });
+    if (land) landOnCurrentTile(r);
+    return;
   }
 }
 

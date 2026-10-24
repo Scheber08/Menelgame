@@ -1,9 +1,16 @@
 import { z } from 'zod';
 import { IdSchema, MoneySchema } from './common';
 
+/** Bild-URL: hochgeladen über den Worker (/img/…) oder extern per https. */
+export const ImageUrlSchema = z
+  .string()
+  .max(300)
+  .regex(/^(\/img\/[A-Za-z0-9/_.-]+|https:\/\/\S+)$/, 'Bild als /img/… oder https://…');
+
 const tileBase = {
   id: IdSchema,
   name: z.string().min(1).max(60),
+  image: ImageUrlSchema.optional(),
 };
 
 /** Kaufbare Felder haben einen Preis und gehören zu einer Gruppe. */
@@ -51,6 +58,13 @@ export const GoToJailTileSchema = z.object({ ...tileBase, type: z.literal('goToJ
 /** Frei Parken; sammelt bei aktiver Regel den Topf ein. */
 export const FreeParkingTileSchema = z.object({ ...tileBase, type: z.literal('freeParking') });
 
+/** Feld eines eigenen Feldtyps (siehe pack.tileTypes). */
+export const CustomTileSchema = z.object({
+  ...tileBase,
+  type: z.literal('custom'),
+  tileType: IdSchema,
+});
+
 export const TileSchema = z.discriminatedUnion('type', [
   StartTileSchema,
   PropertyTileSchema,
@@ -61,6 +75,7 @@ export const TileSchema = z.discriminatedUnion('type', [
   JailTileSchema,
   GoToJailTileSchema,
   FreeParkingTileSchema,
+  CustomTileSchema,
 ]);
 
 export type Tile = z.infer<typeof TileSchema>;
@@ -70,6 +85,20 @@ export type PropertyTile = TileOfType<'property'>;
 export type StationTile = TileOfType<'station'>;
 export type UtilityTile = TileOfType<'utility'>;
 export type OwnableTile = PropertyTile | StationTile | UtilityTile;
+export type CustomTile = TileOfType<'custom'>;
+
+/** Eingebaute Feldtypen; eigene Feldtypen dürfen nicht so heißen. */
+export const BUILT_IN_TILE_TYPES = [
+  'start',
+  'property',
+  'station',
+  'utility',
+  'tax',
+  'card',
+  'jail',
+  'goToJail',
+  'freeParking',
+] as const;
 
 export const OWNABLE_TILE_TYPES = ['property', 'station', 'utility'] as const;
 

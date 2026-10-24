@@ -26,6 +26,7 @@ export const ALL_PHASES: readonly PhaseName[] = [
   'freePhase',
   'awaitingDebt',
   'auction',
+  'awaitingChoice',
 ];
 
 const MESSAGES: Record<ErrorCode, string> = {
@@ -59,6 +60,7 @@ const MESSAGES: Record<ErrorCode, string> = {
   invalidTrade: 'Das Angebot ist so nicht möglich.',
   tooManyTrades: 'Zu viele offene Angebote.',
   invalidRules: 'Ungültige Regelwerte.',
+  unknownOption: 'Diese Möglichkeit gibt es nicht.',
 };
 
 export function engineError(code: ErrorCode): EngineError {
