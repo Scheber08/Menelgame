@@ -1,13 +1,13 @@
 import type { GameState } from '@menelgame/engine';
-import type { RoomInfoResponse, RoomView } from '@menelgame/protocol';
+import type { ClaimResponse, RoomInfoResponse, RoomView } from '@menelgame/protocol';
 import type { Rules } from '@menelgame/schema';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GameScreen } from '../components/GameScreen';
 import { RulesForm } from '../components/RulesForm';
-import { takePendingPack } from '../game/api';
+import { api, takePendingPack } from '../game/api';
 import { takePendingJoin } from '../game/profile';
-import { useOnlineRoom, type OnlineRoom } from '../game/useOnlineRoom';
+import { loadToken, useOnlineRoom, type OnlineRoom } from '../game/useOnlineRoom';
 import { navigate } from '../router';
 import { Lobby, TakeoverSetting } from './Lobby';
 
@@ -128,10 +128,60 @@ function ConnectedRoom({ code }: { code: string }) {
               {t('room.spectating')}
             </div>
           )}
+          {seatId && room.status === 'finished' && <StatsClaim code={code} />}
         </>
       }
       sidebarBottom={isHost && <HostPanel online={online} room={room} state={game.state} />}
     />
+  );
+}
+
+/** Eine Anfrage pro Raum, auch wenn die Komponente mehrfach erscheint. */
+const claims = new Map<string, Promise<ClaimResponse>>();
+
+/** Nach Spielende: Ergebnis einmal in die Statistik des Profils übernehmen. */
+function StatsClaim({ code }: { code: string }) {
+  const { t } = useTranslation();
+  const [result, setResult] = useState<ClaimResponse | 'failed' | null>(null);
+
+  useEffect(() => {
+    const token = loadToken(code);
+    if (!token) return;
+    let cancelled = false;
+    if (!claims.has(code)) claims.set(code, api.claimStats(code, token));
+    claims
+      .get(code)!
+      .then((r) => !cancelled && setResult(r))
+      .catch(() => !cancelled && setResult('failed'));
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  if (!result) return null;
+  if (result === 'failed')
+    return (
+      <div className="banner" role="status">
+        {t('stats.claimFailed')}
+      </div>
+    );
+  return (
+    <div className="banner success" role="status">
+      {t('stats.claimed')}{' '}
+      {result.unlocked.length > 0 &&
+        t('stats.unlocked', {
+          names: result.unlocked.map((id) => t(`achievements.${id}.name`)).join(', '),
+        })}{' '}
+      <a
+        href="/statistik"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate('/statistik');
+        }}
+      >
+        {t('stats.open')}
+      </a>
+    </div>
   );
 }
 

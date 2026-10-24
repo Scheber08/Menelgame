@@ -5,6 +5,7 @@ import { MyPacksPage } from './pages/MyPacksPage';
 import { PackEditorPage } from './pages/PackEditorPage';
 import { RoomPage } from './pages/RoomPage';
 import { SharedPackPage } from './pages/SharedPackPage';
+import { StatsPage } from './pages/StatsPage';
 import { navigate, usePath } from './router';
 
 function NavLink({ to, children }: { to: string; children: string }) {
@@ -34,6 +35,7 @@ export function App() {
   else if (shared) page = <SharedPackPage key={shared[1]} id={shared[1]!} />;
   else if (path.startsWith('/packs')) page = <MyPacksPage />;
   else if (path.startsWith('/lokal')) page = <HotSeatPage />;
+  else if (path.startsWith('/statistik')) page = <StatsPage />;
   else page = <Home />;
 
   return (
@@ -57,6 +59,7 @@ export function App() {
         </a>
         <nav className="header-nav">
           {room && <span className="header-code">{room[1]!.toUpperCase()}</span>}
+          <NavLink to="/statistik">{t('nav.stats')}</NavLink>
           <NavLink to="/packs">{t('nav.packs')}</NavLink>
         </nav>
       </header>

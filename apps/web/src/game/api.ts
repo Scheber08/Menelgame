@@ -2,9 +2,11 @@ import {
   parseRecoveryCode,
   recoveryCode,
   type ApiErrorResponse,
+  type ClaimResponse,
   type PackResponse,
   type PackSummary,
   type ProfileCredentials,
+  type ProfileStatsResponse,
   type RuleSet,
   type RuleSetInput,
 } from '@menelgame/protocol';
@@ -60,16 +62,24 @@ async function request<T>(
   return body as T;
 }
 
-/** Legt bei Bedarf ein Profil an. Ein Profil ist nur eine ID mit Geheimnis – kein Account. */
+let creating: Promise<ProfileCredentials> | null = null;
+
+/**
+ * Legt bei Bedarf ein Profil an. Ein Profil ist nur eine ID mit Geheimnis – kein Account.
+ * Gleichzeitige Aufrufe teilen sich eine Anfrage, sonst entstünden zwei Profile.
+ */
 export async function ensureProfile(): Promise<ProfileCredentials> {
   const existing = loadCredentials();
   if (existing) return existing;
-  const created = await request<ProfileCredentials>('/api/profile', {
-    method: 'POST',
-    auth: false,
-  });
-  storeCredentials(created);
-  return created;
+  creating ??= request<ProfileCredentials>('/api/profile', { method: 'POST', auth: false })
+    .then((created) => {
+      storeCredentials(created);
+      return created;
+    })
+    .finally(() => {
+      creating = null;
+    });
+  return creating;
 }
 
 /** Profil von einem anderen Gerät übernehmen. */
@@ -128,6 +138,12 @@ export const api = {
     return request<RuleSet>('/api/rulesets', { method: 'POST', body: input });
   },
   deleteRuleSet: (id: string) => request<unknown>(`/api/rulesets/${id}`, { method: 'DELETE' }),
+  /** Ergebnis eines beendeten Online-Spiels in die eigene Statistik übernehmen. */
+  claimStats: async (code: string, token: string) => {
+    await ensureProfile();
+    return request<ClaimResponse>('/api/stats/claim', { method: 'POST', body: { code, token } });
+  },
+  stats: () => request<ProfileStatsResponse>('/api/stats'),
   /** Bild hochladen (PNG, JPEG, WebP, GIF bis 1 MB); liefert die URL unter /img/…. */
   uploadImage: async (file: File) => {
     const credentials = await ensureProfile();

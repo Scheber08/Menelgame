@@ -17,7 +17,7 @@ const PING_MS = 25_000;
 
 const tokenKey = (code: string) => `menelgame.room.${code}`;
 
-function loadToken(code: string): string | undefined {
+export function loadToken(code: string): string | undefined {
   try {
     return localStorage.getItem(tokenKey(code)) ?? undefined;
   } catch {

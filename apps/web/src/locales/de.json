@@ -455,7 +455,8 @@
     "resetRules": "Zurücksetzen"
   },
   "nav": {
-    "packs": "Meine Packs"
+    "packs": "Meine Packs",
+    "stats": "Statistik"
   },
   "packs": {
     "heading": "Meine Packs",
@@ -777,5 +778,99 @@
     "nextTurn": "Nächster Zug",
     "end": "Zum Ende",
     "speed": "Tempo"
+  },
+  "stats": {
+    "heading": "Statistik & Erfolge",
+    "noProfile": "Noch kein Profil. Es entsteht automatisch, sobald du ein Online-Spiel beendest oder ein Pack speicherst.",
+    "loadFailed": "Die Statistik konnte nicht geladen werden.",
+    "title": "Dein Titel",
+    "nextTitle_one": "Noch {{count}} Sieg bis „{{title}}“",
+    "nextTitle_other": "Noch {{count}} Siege bis „{{title}}“",
+    "numbers": "Zahlen",
+    "empty": "Noch keine beendeten Online-Spiele.",
+    "games": "Spiele",
+    "wins": "Siege",
+    "winRate": "Siegquote",
+    "rentReceived": "Miete kassiert",
+    "rentPaid": "Miete gezahlt",
+    "propertiesBought": "Felder gekauft",
+    "buildings": "Häuser / Hotels gebaut",
+    "trades": "Tauschgeschäfte",
+    "bestNetWorth": "Bestes Endvermögen",
+    "achievements": "Erfolge ({{count}} von {{total}})",
+    "recent": "Letzte Spiele",
+    "won": "Gewonnen",
+    "rank": "Platz {{rank}} von {{players}}",
+    "onlineOnly": "Gezählt werden beendete Online-Spiele, in denen du einen eigenen Platz hattest.",
+    "claimed": "Spiel in deiner Statistik gespeichert.",
+    "unlocked": "Neue Erfolge: {{names}}.",
+    "claimFailed": "Das Ergebnis konnte nicht gespeichert werden.",
+    "open": "Statistik ansehen",
+    "loading": "Statistik wird geladen …"
+  },
+  "titles": {
+    "newcomer": "Neuling",
+    "landowner": "Grundbesitzer",
+    "investor": "Investor",
+    "tycoon": "Immobilienmogul",
+    "legend": "Legende von Neustadt"
+  },
+  "achievements": {
+    "firstGame": {
+      "name": "Mitgespielt",
+      "text": "Ein Online-Spiel bis zum Ende gespielt."
+    },
+    "regular": {
+      "name": "Stammgast",
+      "text": "Zehn Spiele beendet."
+    },
+    "firstWin": {
+      "name": "Erster Sieg",
+      "text": "Ein Spiel gewonnen."
+    },
+    "fiveWins": {
+      "name": "Seriensieger",
+      "text": "Fünf Spiele gewonnen."
+    },
+    "builder": {
+      "name": "Baulöwe",
+      "text": "In einem Spiel Gebäude im Wert von 15 Häusern gebaut."
+    },
+    "hotelier": {
+      "name": "Hotelier",
+      "text": "In einem Spiel drei Hotels gebaut."
+    },
+    "landlord": {
+      "name": "Miethai",
+      "text": "In einem Spiel 2.000 Taler Miete kassiert."
+    },
+    "monopolist": {
+      "name": "Ganze Viertel",
+      "text": "Ein Spiel mit drei kompletten Gruppen beendet."
+    },
+    "cleanRecord": {
+      "name": "Weiße Weste",
+      "text": "Gewonnen, ohne ein einziges Mal ins Gefängnis zu müssen."
+    },
+    "jailbird": {
+      "name": "Stammzelle",
+      "text": "In einem Spiel dreimal ins Gefängnis gewandert."
+    },
+    "broke": {
+      "name": "Pleitegeier",
+      "text": "Einmal bankrott gegangen. Passiert den Besten."
+    },
+    "dealer": {
+      "name": "Händler",
+      "text": "Fünf Tauschgeschäfte abgeschlossen."
+    },
+    "contractor": {
+      "name": "Vertragspartner",
+      "text": "Drei Vereinbarungen mit Laufzeit geschlossen."
+    },
+    "botSlayer": {
+      "name": "Bot-Bezwinger",
+      "text": "Ein Spiel gegen einen Bot der Stufe Schwer gewonnen."
+    }
   }
 }
