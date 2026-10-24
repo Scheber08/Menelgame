@@ -8,7 +8,7 @@ import {
 import { isOwnable, mortgageValueOf, type Tile } from '@menelgame/schema';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { buildingsLabel, formatMoney, playerName } from '../game/format';
+import { buildingsLabel, describeRule, formatMoney, playerName } from '../game/format';
 
 interface TileInfoProps {
   state: GameState;
@@ -99,6 +99,10 @@ export function TileInfo({ state, tileId, legal, dispatch }: TileInfoProps) {
         )}
       </dl>
       <RentTable t={t} state={state} tile={tile} />
+      {tile.type === 'custom' && <CustomRules t={t} state={state} typeId={tile.tileType} />}
+      {(state.blockedTiles?.[tile.id] ?? 0) > 0 && (
+        <p className="badge offline">{t('tile.blocked')}</p>
+      )}
       {tileActions.length > 0 && (
         <div className="action-buttons">
           {tileActions.map((action) => (
@@ -160,6 +164,25 @@ function RentTable({ t, state, tile }: { t: TFunction; state: GameState; tile: T
           {t('tile.groupBonus', { factor: state.rules.monopolyRentMultiplier })}
         </p>
       )}
+    </div>
+  );
+}
+
+function CustomRules({ t, state, typeId }: { t: TFunction; state: GameState; typeId: string }) {
+  const type = state.pack.tileTypes.find((x) => x.id === typeId);
+  if (!type) return null;
+  return (
+    <div>
+      <h3>
+        <span className="dot" style={{ background: type.color }} />
+        {type.name}
+      </h3>
+      {type.description && <p className="small">{type.description}</p>}
+      <ul className="rule-list small">
+        {type.rules.map((rule, i) => (
+          <li key={i}>{describeRule(t, state.pack, rule)}</li>
+        ))}
+      </ul>
     </div>
   );
 }

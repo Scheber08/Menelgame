@@ -31,3 +31,28 @@ describe('Brett-Geometrie', () => {
     expect(area + g.center.w * g.center.h).toBe(g.width * g.height);
   });
 });
+
+describe('Freie Formen', () => {
+  it('legt einen Ring ohne Überlappung an', () => {
+    const g = boardGeometry({ shape: 'ring' }, 30);
+    for (const a of g.tiles) {
+      expect(a.side).toBe('none');
+      for (const b of g.tiles) if (a !== b) expect(overlaps(a, b)).toBe(false);
+    }
+  });
+
+  it('folgt beim Pfad den Punkten', () => {
+    const g = boardGeometry(
+      {
+        shape: 'path',
+        points: [
+          { x: 0, y: 0 },
+          { x: 100, y: 100 },
+        ],
+      },
+      2,
+    );
+    expect(g.tiles[0]!.x).toBeLessThan(g.tiles[1]!.x);
+    expect(g.tiles[0]!.y).toBeLessThan(g.tiles[1]!.y);
+  });
+});

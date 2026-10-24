@@ -1,9 +1,9 @@
 import { HOTEL, type GameEvent, type GameState, type Player } from '@menelgame/engine';
-import { isOwnable, type Tile } from '@menelgame/schema';
-import { useMemo } from 'react';
+import { isOwnable, type Theme, type Tile } from '@menelgame/schema';
+import { useMemo, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { diceFace, formatMoney } from '../game/format';
-import { boardGeometry, type TileRect } from './geometry';
+import { boardGeometry, type Side, type TileRect } from './geometry';
 
 const STRIPE = 20;
 const OWNER_BAND = 5;
@@ -27,6 +27,16 @@ export function tokenLabels(players: Player[]): Map<string, string> {
   );
 }
 
+/** Farben und Schrift des Packs als CSS-Variablen; ohne Angabe gilt das App-Farbschema. */
+function themeStyle(theme: Theme | undefined): CSSProperties {
+  const vars: Record<string, string> = {};
+  if (theme?.boardColor) vars['--board-bg'] = theme.boardColor;
+  if (theme?.tileColor) vars['--tile-bg'] = theme.tileColor;
+  if (theme?.centerColor) vars['--center-bg'] = theme.centerColor;
+  if (theme?.textColor) vars['--board-text'] = theme.textColor;
+  return vars as CSSProperties;
+}
+
 interface BoardProps {
   state: GameState;
   events: GameEvent[];
@@ -35,26 +45,30 @@ interface BoardProps {
 }
 
 export function Board({ state, events, selectedTileId, onSelectTile }: BoardProps) {
-  const geometry = useMemo(
-    () => boardGeometry(state.pack.layout, state.pack.tiles.length),
-    [state.pack],
-  );
-  const groupColor = useMemo(
-    () => new Map(state.pack.groups.map((g) => [g.id, g.color])),
-    [state.pack],
+  const pack = state.pack;
+  const geometry = useMemo(() => boardGeometry(pack.layout, pack.tiles.length), [pack]);
+  const colors = useMemo(
+    () =>
+      new Map([
+        ...pack.groups.map((g) => [g.id, g.color] as const),
+        ...pack.tileTypes.map((t) => [`type:${t.id}`, t.color] as const),
+      ]),
+    [pack],
   );
 
   const playersAt = (index: number) =>
     state.players.filter((p) => !p.bankrupt && p.position === index);
   const current = state.players[state.currentPlayer];
   const labels = useMemo(() => tokenLabels(state.players), [state.players]);
+  const theme = pack.theme;
 
   return (
     <svg
-      className="board"
+      className={`board font-${theme?.font ?? 'system'}`}
+      style={themeStyle(theme)}
       viewBox={`0 0 ${geometry.width} ${geometry.height}`}
       role="img"
-      aria-label={state.pack.meta.name}
+      aria-label={pack.meta.name}
     >
       <defs>
         <pattern
@@ -66,20 +80,43 @@ export function Board({ state, events, selectedTileId, onSelectTile }: BoardProp
         >
           <line x1="0" y1="0" x2="0" y2="8" className="hatch-line" />
         </pattern>
+        <pattern
+          id="blocked"
+          width="12"
+          height="12"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(-45)"
+        >
+          <rect width="6" height="12" className="blocked-stripe" />
+        </pattern>
       </defs>
-      <rect className="board-bg" x={0} y={0} width={geometry.width} height={geometry.height} />
+      <rect
+        className="board-bg"
+        x={0}
+        y={0}
+        width={geometry.width}
+        height={geometry.height}
+        rx={6}
+      />
       <BoardCenter state={state} events={events} rect={geometry.center} current={current} />
       {geometry.tiles.map((rect) => {
-        const tile = state.pack.tiles[rect.index]!;
+        const tile = pack.tiles[rect.index]!;
+        const color =
+          'group' in tile
+            ? colors.get(tile.group)
+            : tile.type === 'custom'
+              ? colors.get(`type:${tile.tileType}`)
+              : undefined;
         return (
           <TileView
             key={tile.id}
             rect={rect}
             tile={tile}
             state={state}
-            color={'group' in tile ? groupColor.get(tile.group) : undefined}
+            color={color}
             players={playersAt(rect.index)}
             labels={labels}
+            tokens={theme?.tokens ?? 'initials'}
             selected={selectedTileId === tile.id}
             onSelect={() => onSelectTile(tile.id)}
           />
@@ -89,6 +126,45 @@ export function Board({ state, events, selectedTileId, onSelectTile }: BoardProp
   );
 }
 
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Farbstreifen innen, Besitzerband außen; Kacheln (Ring, Pfad) haben den Streifen oben. */
+function tileParts(rect: TileRect, hasStripe: boolean) {
+  const { x, y, w, h } = rect;
+  const side: Side = rect.side;
+  const stripe: Record<Side, Box> = {
+    bottom: { x, y, w, h: STRIPE },
+    top: { x, y: y + h - STRIPE, w, h: STRIPE },
+    left: { x: x + w - STRIPE, y, w: STRIPE, h },
+    right: { x, y, w: STRIPE, h },
+    none: { x, y, w, h: STRIPE * 0.8 },
+  };
+  const band: Record<Side, Box> = {
+    bottom: { x, y: y + h - OWNER_BAND, w, h: OWNER_BAND },
+    top: { x, y, w, h: OWNER_BAND },
+    left: { x, y, w: OWNER_BAND, h },
+    right: { x: x + w - OWNER_BAND, y, w: OWNER_BAND, h },
+    none: { x, y: y + h - OWNER_BAND, w, h: OWNER_BAND },
+  };
+  const content: Record<Side, Box> = {
+    bottom: { x, y: y + STRIPE, w, h: h - STRIPE - OWNER_BAND },
+    top: { x, y: y + OWNER_BAND, w, h: h - STRIPE - OWNER_BAND },
+    left: { x: x + OWNER_BAND, y, w: w - STRIPE - OWNER_BAND, h },
+    right: { x: x + STRIPE, y, w: w - STRIPE - OWNER_BAND, h },
+    none: { x, y: y + STRIPE * 0.8, w, h: h - STRIPE * 0.8 - OWNER_BAND },
+  };
+  return {
+    stripe: stripe[side],
+    band: band[side],
+    content: hasStripe ? content[side] : { x, y, w, h },
+  };
+}
+
 interface TileViewProps {
   rect: TileRect;
   tile: Tile;
@@ -96,6 +172,7 @@ interface TileViewProps {
   color: string | undefined;
   players: Player[];
   labels: Map<string, string>;
+  tokens: Theme['tokens'];
   selected: boolean;
   onSelect: () => void;
 }
@@ -107,45 +184,29 @@ function TileView({
   color,
   players,
   labels,
+  tokens,
   selected,
   onSelect,
 }: TileViewProps) {
   const { t } = useTranslation();
   const ts = isOwnable(tile) ? state.tiles[tile.id] : undefined;
   const owner = ts?.owner ? state.players.find((p) => p.id === ts.owner) : undefined;
-  const { x, y, w, h, side } = rect;
-  const horizontal = side === 'bottom' || side === 'top';
+  const { x, y, w, h } = rect;
+  const horizontal = rect.side === 'bottom' || rect.side === 'top' || rect.side === 'none';
   const hasStripe = color !== undefined && !rect.corner;
-
-  // Farbstreifen an der Innenkante, Besitzerband an der Außenkante.
-  const stripe = {
-    bottom: { x, y, w, h: STRIPE },
-    top: { x, y: y + h - STRIPE, w, h: STRIPE },
-    left: { x: x + w - STRIPE, y, w: STRIPE, h },
-    right: { x, y, w: STRIPE, h },
-  }[side];
-  const band = {
-    bottom: { x, y: y + h - OWNER_BAND, w, h: OWNER_BAND },
-    top: { x, y, w, h: OWNER_BAND },
-    left: { x, y, w: OWNER_BAND, h },
-    right: { x: x + w - OWNER_BAND, y, w: OWNER_BAND, h },
-  }[side];
-  const content = hasStripe
-    ? {
-        bottom: { x, y: y + STRIPE, w, h: h - STRIPE - OWNER_BAND },
-        top: { x, y: y + OWNER_BAND, w, h: h - STRIPE - OWNER_BAND },
-        left: { x: x + OWNER_BAND, y, w: w - STRIPE - OWNER_BAND, h },
-        right: { x: x + STRIPE, y, w: w - STRIPE - OWNER_BAND, h },
-      }[side]
-    : { x, y, w, h };
+  const { stripe, band, content } = tileParts(rect, hasStripe);
+  const blocked = (state.blockedTiles?.[tile.id] ?? 0) > 0;
 
   const subtitle =
     'price' in tile
       ? formatMoney(t, tile.price)
       : tile.type === 'tax'
         ? formatMoney(t, tile.amount)
-        : null;
+        : tile.type === 'custom'
+          ? (state.pack.tileTypes.find((x) => x.id === tile.tileType)?.name ?? null)
+          : null;
   const deck = tile.type === 'card' ? state.pack.decks.find((d) => d.id === tile.deck) : undefined;
+  const corner = rect.corner || rect.side === 'none';
 
   return (
     <g
@@ -161,7 +222,14 @@ function TileView({
         }
       }}
     >
-      <rect className="tile-bg" x={x} y={y} width={w} height={h} />
+      <rect
+        className="tile-bg"
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        rx={rect.side === 'none' ? 8 : 0}
+      />
       {hasStripe && (
         <rect x={stripe.x} y={stripe.y} width={stripe.w} height={stripe.h} fill={color} />
       )}
@@ -169,9 +237,24 @@ function TileView({
         <Buildings stripe={stripe} horizontal={horizontal} count={ts.buildings} />
       )}
       {owner && <rect x={band.x} y={band.y} width={band.w} height={band.h} fill={owner.color} />}
-      <foreignObject x={content.x} y={content.y} width={content.w} height={content.h}>
-        <div className={`tile-label${rect.corner ? ' corner' : ''}`} lang="de">
-          {deck && (
+      {tile.image && (
+        <image
+          href={tile.image}
+          x={content.x + 4}
+          y={content.y + 2}
+          width={content.w - 8}
+          height={content.h * 0.45}
+          preserveAspectRatio="xMidYMid meet"
+        />
+      )}
+      <foreignObject
+        x={content.x}
+        y={tile.image ? content.y + content.h * 0.45 : content.y}
+        width={content.w}
+        height={tile.image ? content.h * 0.55 : content.h}
+      >
+        <div className={`tile-label${corner && !tile.image ? ' corner' : ''}`} lang="de">
+          {deck && !tile.image && (
             <span className="tile-symbol" style={{ color: deck.color }}>
               ?
             </span>
@@ -195,17 +278,22 @@ function TileView({
           fill="url(#hatch)"
         />
       )}
-      <Tokens players={players} labels={labels} area={content} />
-      <rect className="tile-outline" x={x} y={y} width={w} height={h} />
+      {blocked && (
+        <rect className="blocked" x={x} y={y} width={w} height={h} fill="url(#blocked)">
+          <title>{t('tile.blocked')}</title>
+        </rect>
+      )}
+      <Tokens players={players} labels={labels} area={content} style={tokens} />
+      <rect
+        className="tile-outline"
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        rx={rect.side === 'none' ? 8 : 0}
+      />
     </g>
   );
-}
-
-interface Box {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
 }
 
 function Buildings({
@@ -253,10 +341,12 @@ function Tokens({
   players,
   labels,
   area,
+  style,
 }: {
   players: Player[];
   labels: Map<string, string>;
   area: Box;
+  style: Theme['tokens'];
 }) {
   if (players.length === 0) return null;
   const perRow = Math.max(1, Math.floor((area.w - 4) / (TOKEN_R * 2 + 2)));
@@ -267,18 +357,29 @@ function Tokens({
         const col = i % perRow;
         const cx = area.x + 4 + TOKEN_R + col * (TOKEN_R * 2 + 2);
         const cy = area.y + area.h - 4 - TOKEN_R - row * (TOKEN_R * 2 + 2);
+        const label = labels.get(p.id) ?? '?';
         return (
           <g key={p.id} className={`token${p.inJail ? ' jailed' : ''}`}>
-            <circle cx={cx} cy={cy} r={TOKEN_R} fill={p.color} />
-            <text
-              x={cx}
-              y={cy}
-              dy="0.35em"
-              textAnchor="middle"
-              className={labels.get(p.id)!.length > 1 ? 'narrow' : ''}
-            >
-              {labels.get(p.id)}
-            </text>
+            <title>{p.name}</title>
+            {style === 'pawns' ? (
+              <path
+                d={`M ${cx} ${cy - TOKEN_R} a 4 4 0 1 1 0.01 0 Z M ${cx - 4} ${cy - 2} h 8 l 3 ${TOKEN_R + 1} h -14 Z`}
+                fill={p.color}
+              />
+            ) : (
+              <circle cx={cx} cy={cy} r={TOKEN_R} fill={p.color} />
+            )}
+            {style === 'initials' && (
+              <text
+                x={cx}
+                y={cy}
+                dy="0.35em"
+                textAnchor="middle"
+                className={label.length > 1 ? 'narrow' : ''}
+              >
+                {label}
+              </text>
+            )}
           </g>
         );
       })}
@@ -301,11 +402,16 @@ function BoardCenter({
   const lastCard = [...events].reverse().find((e) => e.type === 'cardDrawn');
   const deck = lastCard ? state.pack.decks.find((d) => d.id === lastCard.deckId) : undefined;
   const supply = (n: number | null) => (n === null ? t('center.unlimited') : n);
+  const image = state.pack.theme?.centerImage;
 
   return (
     <foreignObject x={rect.x} y={rect.y} width={rect.w} height={rect.h}>
       <div className="board-center">
-        <div className="center-title">Menelgame</div>
+        {image ? (
+          <img className="center-image" src={image} alt="" />
+        ) : (
+          <div className="center-title">Menelgame</div>
+        )}
         <div className="center-pack">{state.pack.meta.name}</div>
         {current && state.phase.name !== 'gameOver' && (
           <div className="center-turn">

@@ -23,6 +23,8 @@ export interface GameScreenProps {
   /** hotseat: dieser Bildschirm steuert alle Spieler; online: nur `me`. */
   mode: 'hotseat' | 'online';
   me: string | null;
+  /** Hot-Seat: Plätze, die Bots spielen (nicht von Hand steuerbar). */
+  botIds?: string[];
   dispatch: (action: Action) => void;
   error: UiError | null;
   turnDeadline?: number | null;
@@ -49,11 +51,13 @@ export function GameScreen(props: GameScreenProps) {
   const controls = useMemo(
     () =>
       mode === 'hotseat'
-        ? activePlayers(state).map((p) => p.id)
+        ? activePlayers(state)
+            .map((p) => p.id)
+            .filter((id) => !props.botIds?.includes(id))
         : me && !state.players.find((p) => p.id === me)?.bankrupt
           ? [me]
           : [],
-    [mode, me, state],
+    [mode, me, state, props.botIds],
   );
   const canAct = actor !== null && controls.includes(actor);
   const actorLegal = useMemo(
