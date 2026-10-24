@@ -1,0 +1,677 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "id": "wien",
+    "name": "Wien-Edition",
+    "version": "1.0.0",
+    "author": "Menelgame",
+    "description": "Vom Brunnenmarkt bis zum Graben: 40 Felder quer durch Wien, mit Schmäh und Magistrat."
+  },
+  "maxPlayers": 6,
+  "dice": {
+    "count": 2,
+    "sides": 6
+  },
+  "rules": {
+    "startingCash": 1500,
+    "passStartBonus": 200,
+    "landOnStartExtra": 0,
+    "auctions": true,
+    "freeParkingPot": false,
+    "jail": {
+      "bail": 50,
+      "maxTurns": 3,
+      "collectRentInJail": true
+    },
+    "tripleDoublesToJail": true,
+    "buildingLimit": {
+      "houses": 32,
+      "hotels": 12
+    },
+    "evenBuilding": true,
+    "monopolyRentMultiplier": 2,
+    "buildingSellPercent": 50,
+    "mortgageInterestPercent": 10,
+    "victory": {
+      "type": "lastStanding"
+    },
+    "bankruptcy": {
+      "mode": "toCreditor"
+    }
+  },
+  "layout": {
+    "shape": "square"
+  },
+  "theme": {
+    "boardColor": "#e9dfc8",
+    "tileColor": "#fffaf0",
+    "centerColor": "#efe3c6",
+    "textColor": "#2b2118",
+    "font": "serif",
+    "tokens": "initials"
+  },
+  "groups": [
+    {
+      "id": "vorstadt",
+      "name": "Vorstadt",
+      "color": "#8b5a3c"
+    },
+    {
+      "id": "donau",
+      "name": "An der Donau",
+      "color": "#7cc4e6"
+    },
+    {
+      "id": "prater",
+      "name": "Prater",
+      "color": "#d65aa8"
+    },
+    {
+      "id": "maerkte",
+      "name": "Märkte",
+      "color": "#f08c2e"
+    },
+    {
+      "id": "kultur",
+      "name": "Kultur",
+      "color": "#d64040"
+    },
+    {
+      "id": "ring",
+      "name": "Ringstraße",
+      "color": "#e8c832"
+    },
+    {
+      "id": "heurige",
+      "name": "Heurigenorte",
+      "color": "#3c9a5a"
+    },
+    {
+      "id": "innere-stadt",
+      "name": "Innere Stadt",
+      "color": "#2f4fa8"
+    },
+    {
+      "id": "oeffis",
+      "name": "Öffis",
+      "color": "#4a4a4a"
+    },
+    {
+      "id": "versorger",
+      "name": "Versorgung",
+      "color": "#8a8a8a"
+    }
+  ],
+  "tiles": [
+    {
+      "id": "start",
+      "name": "Los geht’s",
+      "type": "start"
+    },
+    {
+      "id": "favoritenstrasse",
+      "name": "Favoritenstraße",
+      "type": "property",
+      "group": "vorstadt",
+      "price": 60,
+      "houseCost": 50,
+      "rent": [3, 15, 40, 110, 180, 260]
+    },
+    {
+      "id": "magistrat-1",
+      "name": "Magistrat",
+      "type": "card",
+      "deck": "magistrat"
+    },
+    {
+      "id": "ottakringer-strasse",
+      "name": "Ottakringer Straße",
+      "type": "property",
+      "group": "vorstadt",
+      "price": 70,
+      "houseCost": 50,
+      "rent": [5, 25, 70, 200, 340, 470]
+    },
+    {
+      "id": "parkpickerl",
+      "name": "Parkpickerl",
+      "type": "tax",
+      "amount": 200
+    },
+    {
+      "id": "westbahnhof",
+      "name": "Westbahnhof",
+      "type": "station",
+      "group": "oeffis",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "alte-donau",
+      "name": "Alte Donau",
+      "type": "property",
+      "group": "donau",
+      "price": 100,
+      "houseCost": 50,
+      "rent": [7, 35, 95, 280, 410, 560]
+    },
+    {
+      "id": "schmaeh-1",
+      "name": "Schmäh",
+      "type": "card",
+      "deck": "schmaeh"
+    },
+    {
+      "id": "donauinsel",
+      "name": "Donauinsel",
+      "type": "property",
+      "group": "donau",
+      "price": 100,
+      "houseCost": 50,
+      "rent": [7, 35, 95, 280, 410, 560]
+    },
+    {
+      "id": "donaukanal",
+      "name": "Donaukanal",
+      "type": "property",
+      "group": "donau",
+      "price": 120,
+      "houseCost": 50,
+      "rent": [9, 45, 110, 310, 450, 600]
+    },
+    {
+      "id": "haefn",
+      "name": "Häfn",
+      "type": "jail"
+    },
+    {
+      "id": "hauptallee",
+      "name": "Hauptallee",
+      "type": "property",
+      "group": "prater",
+      "price": 140,
+      "houseCost": 100,
+      "rent": [11, 55, 150, 430, 600, 760]
+    },
+    {
+      "id": "fernwaerme",
+      "name": "Fernwärme",
+      "type": "utility",
+      "group": "versorger",
+      "price": 150,
+      "multipliers": [4, 10]
+    },
+    {
+      "id": "wurstelprater",
+      "name": "Wurstelprater",
+      "type": "property",
+      "group": "prater",
+      "price": 140,
+      "houseCost": 100,
+      "rent": [11, 55, 150, 430, 600, 760]
+    },
+    {
+      "id": "riesenradplatz",
+      "name": "Riesenradplatz",
+      "type": "property",
+      "group": "prater",
+      "price": 160,
+      "houseCost": 100,
+      "rent": [13, 65, 180, 500, 700, 880]
+    },
+    {
+      "id": "schwedenplatz",
+      "name": "Schwedenplatz",
+      "type": "station",
+      "group": "oeffis",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "brunnenmarkt",
+      "name": "Brunnenmarkt",
+      "type": "property",
+      "group": "maerkte",
+      "price": 180,
+      "houseCost": 100,
+      "rent": [15, 75, 210, 580, 780, 960]
+    },
+    {
+      "id": "magistrat-2",
+      "name": "Magistrat",
+      "type": "card",
+      "deck": "magistrat"
+    },
+    {
+      "id": "karmelitermarkt",
+      "name": "Karmelitermarkt",
+      "type": "property",
+      "group": "maerkte",
+      "price": 180,
+      "houseCost": 100,
+      "rent": [15, 75, 210, 580, 780, 960]
+    },
+    {
+      "id": "naschmarkt",
+      "name": "Naschmarkt",
+      "type": "property",
+      "group": "maerkte",
+      "price": 200,
+      "houseCost": 100,
+      "rent": [17, 85, 240, 640, 850, 1030]
+    },
+    {
+      "id": "kaffeehaus",
+      "name": "Kaffeehaus",
+      "type": "freeParking"
+    },
+    {
+      "id": "museumsquartier",
+      "name": "Museumsquartier",
+      "type": "property",
+      "group": "kultur",
+      "price": 220,
+      "houseCost": 150,
+      "rent": [19, 95, 270, 700, 880, 1060]
+    },
+    {
+      "id": "schmaeh-2",
+      "name": "Schmäh",
+      "type": "card",
+      "deck": "schmaeh"
+    },
+    {
+      "id": "albertina",
+      "name": "Albertina",
+      "type": "property",
+      "group": "kultur",
+      "price": 220,
+      "houseCost": 150,
+      "rent": [19, 95, 270, 700, 880, 1060]
+    },
+    {
+      "id": "burgtheater",
+      "name": "Burgtheater",
+      "type": "property",
+      "group": "kultur",
+      "price": 240,
+      "houseCost": 150,
+      "rent": [21, 105, 300, 760, 940, 1120]
+    },
+    {
+      "id": "karlsplatz",
+      "name": "Karlsplatz",
+      "type": "station",
+      "group": "oeffis",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "schottenring",
+      "name": "Schottenring",
+      "type": "property",
+      "group": "ring",
+      "price": 260,
+      "houseCost": 150,
+      "rent": [23, 115, 330, 820, 1000, 1180]
+    },
+    {
+      "id": "stubenring",
+      "name": "Stubenring",
+      "type": "property",
+      "group": "ring",
+      "price": 260,
+      "houseCost": 150,
+      "rent": [23, 115, 330, 820, 1000, 1180]
+    },
+    {
+      "id": "hochquellwasser",
+      "name": "Hochquellwasser",
+      "type": "utility",
+      "group": "versorger",
+      "price": 150,
+      "multipliers": [4, 10]
+    },
+    {
+      "id": "opernring",
+      "name": "Opernring",
+      "type": "property",
+      "group": "ring",
+      "price": 280,
+      "houseCost": 150,
+      "rent": [25, 125, 360, 880, 1060, 1240]
+    },
+    {
+      "id": "ab-in-den-haefn",
+      "name": "Ab in den Häfn",
+      "type": "goToJail"
+    },
+    {
+      "id": "nussdorf",
+      "name": "Nussdorf",
+      "type": "property",
+      "group": "heurige",
+      "price": 300,
+      "houseCost": 200,
+      "rent": [27, 135, 400, 920, 1120, 1320]
+    },
+    {
+      "id": "grinzing",
+      "name": "Grinzing",
+      "type": "property",
+      "group": "heurige",
+      "price": 300,
+      "houseCost": 200,
+      "rent": [27, 135, 400, 920, 1120, 1320]
+    },
+    {
+      "id": "magistrat-3",
+      "name": "Magistrat",
+      "type": "card",
+      "deck": "magistrat"
+    },
+    {
+      "id": "kahlenberg",
+      "name": "Kahlenberg",
+      "type": "property",
+      "group": "heurige",
+      "price": 320,
+      "houseCost": 200,
+      "rent": [29, 145, 430, 980, 1180, 1380]
+    },
+    {
+      "id": "hauptbahnhof",
+      "name": "Hauptbahnhof",
+      "type": "station",
+      "group": "oeffis",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "schmaeh-3",
+      "name": "Schmäh",
+      "type": "card",
+      "deck": "schmaeh"
+    },
+    {
+      "id": "kohlmarkt",
+      "name": "Kohlmarkt",
+      "type": "property",
+      "group": "innere-stadt",
+      "price": 360,
+      "houseCost": 200,
+      "rent": [36, 175, 500, 1100, 1320, 1520]
+    },
+    {
+      "id": "hundesteuer",
+      "name": "Hundesteuer",
+      "type": "tax",
+      "amount": 100
+    },
+    {
+      "id": "graben",
+      "name": "Graben",
+      "type": "property",
+      "group": "innere-stadt",
+      "price": 400,
+      "houseCost": 200,
+      "rent": [48, 210, 600, 1350, 1600, 1900]
+    }
+  ],
+  "decks": [
+    {
+      "id": "schmaeh",
+      "name": "Schmäh",
+      "color": "#c8102e",
+      "cards": [
+        {
+          "id": "zum-start",
+          "text": "Der Fiaker wartet schon: Fahr zum Start.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "start"
+            }
+          ]
+        },
+        {
+          "id": "burgtheater",
+          "text": "Stehplatzkarte ergattert! Rück vor zum Burgtheater.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "burgtheater"
+            }
+          ]
+        },
+        {
+          "id": "graben",
+          "text": "Schaufensterbummel: Rück vor zum Graben.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "graben"
+            }
+          ]
+        },
+        {
+          "id": "naechste-station",
+          "text": "Die U-Bahn fährt gleich ein: Rück vor zur nächsten Station. Gehört sie jemandem, zahlst du doppelte Miete.",
+          "effects": [
+            {
+              "kind": "moveToNearest",
+              "tileType": "station",
+              "rentMultiplier": 2
+            }
+          ]
+        },
+        {
+          "id": "naechster-versorger",
+          "text": "Rohrbruch im Altbau! Rück vor zum nächsten Versorger. Gehört er jemandem, zahlst du das Zehnfache deines Wurfs.",
+          "effects": [
+            {
+              "kind": "moveToNearest",
+              "tileType": "utility",
+              "utilityDiceMultiplier": 10
+            }
+          ]
+        },
+        {
+          "id": "zurueck",
+          "text": "Umleitung wegen Baustelle am Gürtel: Geh drei Felder zurück.",
+          "effects": [
+            {
+              "kind": "moveBy",
+              "steps": -3
+            }
+          ]
+        },
+        {
+          "id": "haefn",
+          "text": "Ohne Fahrschein in der Bim erwischt: Ab in den Häfn.",
+          "effects": [
+            {
+              "kind": "goToJail"
+            }
+          ]
+        },
+        {
+          "id": "frei",
+          "text": "Ein Onkel bei der Polizei: Du kommst aus dem Häfn frei. Behalte diese Karte.",
+          "effects": [
+            {
+              "kind": "jailFreeCard"
+            }
+          ]
+        },
+        {
+          "id": "sanierung",
+          "text": "Gründerzeitfassade saniert: Zahl 25 pro Haus und 100 pro Hotel.",
+          "effects": [
+            {
+              "kind": "repairs",
+              "perHouse": 25,
+              "perHotel": 100
+            }
+          ]
+        },
+        {
+          "id": "falschparker",
+          "text": "Kurzparkzone übersehen: Zahl 15.",
+          "effects": [
+            {
+              "kind": "pay",
+              "amount": 15
+            }
+          ]
+        },
+        {
+          "id": "lotto",
+          "text": "Brieflos aufgerubbelt: Erhalte 50.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 50
+            }
+          ]
+        },
+        {
+          "id": "heuriger",
+          "text": "Du lädst alle zum Heurigen ein. Zahl jedem Spieler 50.",
+          "effects": [
+            {
+              "kind": "payEach",
+              "amount": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "magistrat",
+      "name": "Magistrat",
+      "color": "#7a6a4f",
+      "cards": [
+        {
+          "id": "rueckzahlung",
+          "text": "Der Magistrat hat sich verrechnet: Erhalte 200.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 200
+            }
+          ]
+        },
+        {
+          "id": "ball",
+          "text": "Ballsaison: Zahl 50 für die Ballkarte.",
+          "effects": [
+            {
+              "kind": "pay",
+              "amount": 50
+            }
+          ]
+        },
+        {
+          "id": "geburtstag",
+          "text": "Du hast Namenstag! Jeder Spieler zahlt dir 10.",
+          "effects": [
+            {
+              "kind": "collectFromEach",
+              "amount": 10
+            }
+          ]
+        },
+        {
+          "id": "erbe",
+          "text": "Erbschaft von der Tante aus Hietzing: Erhalte 100.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 100
+            }
+          ]
+        },
+        {
+          "id": "arzt",
+          "text": "Wahlarzt statt Kassenarzt: Zahl 50.",
+          "effects": [
+            {
+              "kind": "pay",
+              "amount": 50
+            }
+          ]
+        },
+        {
+          "id": "fernwaerme-gutschrift",
+          "text": "Gutschrift von der Fernwärme: Erhalte 20.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 20
+            }
+          ]
+        },
+        {
+          "id": "zum-start",
+          "text": "Amtsweg erledigt: Rück vor bis zum Start.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "start"
+            }
+          ]
+        },
+        {
+          "id": "haefn",
+          "text": "Amtsbeleidigung: Ab in den Häfn.",
+          "effects": [
+            {
+              "kind": "goToJail"
+            }
+          ]
+        },
+        {
+          "id": "frei",
+          "text": "Gnadengesuch genehmigt: Du kommst aus dem Häfn frei. Behalte diese Karte.",
+          "effects": [
+            {
+              "kind": "jailFreeCard"
+            }
+          ]
+        },
+        {
+          "id": "strassenreinigung",
+          "text": "Schneeräumung vor dem Haus vergessen: Zahl 40 pro Haus und 115 pro Hotel.",
+          "effects": [
+            {
+              "kind": "repairs",
+              "perHouse": 40,
+              "perHotel": 115
+            }
+          ]
+        },
+        {
+          "id": "flohmarkt",
+          "text": "Am Flohmarkt Gerümpel verkauft: Erhalte 45.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 45
+            }
+          ]
+        },
+        {
+          "id": "kaffeehaus",
+          "text": "Die Melange geht auf dich: Zahl 25.",
+          "effects": [
+            {
+              "kind": "pay",
+              "amount": 25
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

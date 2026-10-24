@@ -1,0 +1,657 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "id": "fantasy",
+    "name": "Fantasy-Welt",
+    "version": "1.0.0",
+    "author": "Menelgame",
+    "description": "32 Felder voller Magie: Portale, ein Drachenhort, eine Taverne, die Ruhm zählt, und eine Schatzkammer, die mit jedem Vorbeiziehen wächst."
+  },
+  "maxPlayers": 6,
+  "dice": {
+    "count": 2,
+    "sides": 6
+  },
+  "rules": {
+    "startingCash": 1300,
+    "passStartBonus": 150,
+    "landOnStartExtra": 0,
+    "auctions": true,
+    "freeParkingPot": false,
+    "jail": {
+      "bail": 50,
+      "maxTurns": 3,
+      "collectRentInJail": true
+    },
+    "tripleDoublesToJail": true,
+    "buildingLimit": {
+      "houses": 26,
+      "hotels": 10
+    },
+    "evenBuilding": true,
+    "monopolyRentMultiplier": 2,
+    "buildingSellPercent": 50,
+    "mortgageInterestPercent": 10,
+    "victory": {
+      "type": "lastStanding"
+    },
+    "bankruptcy": {
+      "mode": "toCreditor"
+    }
+  },
+  "layout": {
+    "shape": "square"
+  },
+  "theme": {
+    "boardColor": "#1d1430",
+    "tileColor": "#2d2245",
+    "centerColor": "#241a3a",
+    "textColor": "#efe6ff",
+    "font": "serif",
+    "tokens": "pawns"
+  },
+  "variables": [
+    {
+      "id": "ruhm",
+      "name": "Ruhm",
+      "scope": "player",
+      "initial": 0
+    },
+    {
+      "id": "schatz",
+      "name": "Schatz",
+      "scope": "game",
+      "initial": 100
+    }
+  ],
+  "tileTypes": [
+    {
+      "id": "portal",
+      "name": "Portal",
+      "color": "#7c3aed",
+      "description": "Bringt dich sofort zum anderen Portal.",
+      "rules": [
+        {
+          "trigger": "land",
+          "conditions": [],
+          "effects": [
+            {
+              "kind": "moveToNextOfType",
+              "tileType": "portal",
+              "passTiles": false,
+              "land": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "drachenhort",
+      "name": "Drachenhort",
+      "color": "#dc2626",
+      "description": "Der Drache schläft. Wagst du es?",
+      "rules": [
+        {
+          "trigger": "land",
+          "conditions": [],
+          "effects": [
+            {
+              "kind": "choice",
+              "options": [
+                {
+                  "label": "Gold rauben",
+                  "effects": [
+                    {
+                      "kind": "collect",
+                      "amount": 250
+                    },
+                    {
+                      "kind": "skipTurns",
+                      "turns": 1
+                    }
+                  ]
+                },
+                {
+                  "label": "Leise weiterziehen",
+                  "effects": [
+                    {
+                      "kind": "setVariable",
+                      "variable": "ruhm",
+                      "op": "add",
+                      "value": 1
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "taverne",
+      "name": "Taverne",
+      "color": "#d97706",
+      "description": "Jeder Besuch bringt Ruhm. Wer drei Ruhm hat, wird gefeiert.",
+      "rules": [
+        {
+          "trigger": "land",
+          "conditions": [],
+          "effects": [
+            {
+              "kind": "setVariable",
+              "variable": "ruhm",
+              "op": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "trigger": "land",
+          "conditions": [
+            {
+              "kind": "variable",
+              "variable": "ruhm",
+              "op": "gte",
+              "value": 3
+            }
+          ],
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 300
+            },
+            {
+              "kind": "setVariable",
+              "variable": "ruhm",
+              "op": "set",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "schatzkammer",
+      "name": "Schatzkammer",
+      "color": "#ca8a04",
+      "description": "Wer vorbeizieht, legt etwas hinein. Wer darauf landet, nimmt alles.",
+      "rules": [
+        {
+          "trigger": "pass",
+          "conditions": [],
+          "effects": [
+            {
+              "kind": "setVariable",
+              "variable": "schatz",
+              "op": "add",
+              "value": 25
+            }
+          ]
+        },
+        {
+          "trigger": "land",
+          "conditions": [],
+          "effects": [
+            {
+              "kind": "collectVariable",
+              "variable": "schatz",
+              "percent": 100
+            },
+            {
+              "kind": "setVariable",
+              "variable": "schatz",
+              "op": "set",
+              "value": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sumpf",
+      "name": "Irrlichtsumpf",
+      "color": "#15803d",
+      "description": "Mit etwas Pech folgst du einem Irrlicht zurück.",
+      "rules": [
+        {
+          "trigger": "land",
+          "conditions": [
+            {
+              "kind": "chance",
+              "percent": 50
+            }
+          ],
+          "effects": [
+            {
+              "kind": "moveBy",
+              "steps": -3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "id": "auen",
+      "name": "Auenland",
+      "color": "#a16207"
+    },
+    {
+      "id": "wald",
+      "name": "Elfenwald",
+      "color": "#22c55e"
+    },
+    {
+      "id": "berg",
+      "name": "Zwergenberge",
+      "color": "#94a3b8"
+    },
+    {
+      "id": "kueste",
+      "name": "Nebelküste",
+      "color": "#38bdf8"
+    },
+    {
+      "id": "magier",
+      "name": "Magierviertel",
+      "color": "#c084fc"
+    },
+    {
+      "id": "koenig",
+      "name": "Königshof",
+      "color": "#facc15"
+    },
+    {
+      "id": "reittiere",
+      "name": "Reittiere",
+      "color": "#64748b"
+    },
+    {
+      "id": "mana",
+      "name": "Mana",
+      "color": "#06b6d4"
+    }
+  ],
+  "tiles": [
+    {
+      "id": "weltenbaum",
+      "name": "Weltenbaum",
+      "type": "start"
+    },
+    {
+      "id": "moosdorf",
+      "name": "Moosdorf",
+      "type": "property",
+      "group": "auen",
+      "price": 60,
+      "houseCost": 50,
+      "rent": [3, 15, 40, 110, 180, 260]
+    },
+    {
+      "id": "orakel-1",
+      "name": "Orakel",
+      "type": "card",
+      "deck": "orakel"
+    },
+    {
+      "id": "kroetenweiler",
+      "name": "Krötenweiler",
+      "type": "property",
+      "group": "auen",
+      "price": 70,
+      "houseCost": 50,
+      "rent": [5, 25, 70, 200, 340, 470]
+    },
+    {
+      "id": "schatzkammer",
+      "name": "Schatzkammer",
+      "type": "custom",
+      "tileType": "schatzkammer"
+    },
+    {
+      "id": "greifenhorst",
+      "name": "Greifenhorst",
+      "type": "station",
+      "group": "reittiere",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "elfenhain",
+      "name": "Elfenhain",
+      "type": "property",
+      "group": "wald",
+      "price": 100,
+      "houseCost": 50,
+      "rent": [7, 35, 95, 280, 410, 560]
+    },
+    {
+      "id": "portal-nord",
+      "name": "Portal des Nordens",
+      "type": "custom",
+      "tileType": "portal"
+    },
+    {
+      "id": "mondlichtung",
+      "name": "Mondlichtung",
+      "type": "property",
+      "group": "wald",
+      "price": 100,
+      "houseCost": 50,
+      "rent": [7, 35, 95, 280, 410, 560]
+    },
+    {
+      "id": "silberquelle",
+      "name": "Silberquelle",
+      "type": "property",
+      "group": "wald",
+      "price": 120,
+      "houseCost": 50,
+      "rent": [9, 45, 110, 310, 450, 600]
+    },
+    {
+      "id": "kerker",
+      "name": "Kerker",
+      "type": "jail"
+    },
+    {
+      "id": "zwergenmine",
+      "name": "Zwergenmine",
+      "type": "property",
+      "group": "berg",
+      "price": 140,
+      "houseCost": 100,
+      "rent": [11, 55, 150, 430, 600, 760]
+    },
+    {
+      "id": "manaquelle",
+      "name": "Manaquelle",
+      "type": "utility",
+      "group": "mana",
+      "price": 150,
+      "multipliers": [4, 10]
+    },
+    {
+      "id": "eisenhalle",
+      "name": "Eisenhalle",
+      "type": "property",
+      "group": "berg",
+      "price": 150,
+      "houseCost": 100,
+      "rent": [12, 60, 160, 460, 645, 815]
+    },
+    {
+      "id": "runenschmiede",
+      "name": "Runenschmiede",
+      "type": "property",
+      "group": "berg",
+      "price": 160,
+      "houseCost": 100,
+      "rent": [13, 65, 180, 500, 700, 880]
+    },
+    {
+      "id": "taverne",
+      "name": "Taverne zum Einhorn",
+      "type": "custom",
+      "tileType": "taverne"
+    },
+    {
+      "id": "lagerfeuer",
+      "name": "Lagerfeuer",
+      "type": "freeParking"
+    },
+    {
+      "id": "nebelhafen",
+      "name": "Nebelhafen",
+      "type": "property",
+      "group": "kueste",
+      "price": 180,
+      "houseCost": 100,
+      "rent": [15, 75, 210, 580, 780, 960]
+    },
+    {
+      "id": "orakel-2",
+      "name": "Orakel",
+      "type": "card",
+      "deck": "orakel"
+    },
+    {
+      "id": "leuchtturm",
+      "name": "Leuchtturmklippe",
+      "type": "property",
+      "group": "kueste",
+      "price": 200,
+      "houseCost": 100,
+      "rent": [17, 85, 240, 640, 850, 1030]
+    },
+    {
+      "id": "drachenhort",
+      "name": "Drachenhort",
+      "type": "custom",
+      "tileType": "drachenhort"
+    },
+    {
+      "id": "drachenreiterei",
+      "name": "Drachenreiterei",
+      "type": "station",
+      "group": "reittiere",
+      "price": 200,
+      "rent": [25, 50, 100, 200]
+    },
+    {
+      "id": "sternwarte",
+      "name": "Sternwarte",
+      "type": "property",
+      "group": "magier",
+      "price": 220,
+      "houseCost": 150,
+      "rent": [19, 95, 270, 700, 880, 1060]
+    },
+    {
+      "id": "portal-sued",
+      "name": "Portal des Südens",
+      "type": "custom",
+      "tileType": "portal"
+    },
+    {
+      "id": "fluch",
+      "name": "Fluch des Kerkers",
+      "type": "goToJail"
+    },
+    {
+      "id": "turm-der-winde",
+      "name": "Turm der Winde",
+      "type": "property",
+      "group": "magier",
+      "price": 240,
+      "houseCost": 150,
+      "rent": [21, 105, 300, 760, 940, 1120]
+    },
+    {
+      "id": "akademie",
+      "name": "Arkane Akademie",
+      "type": "property",
+      "group": "magier",
+      "price": 260,
+      "houseCost": 150,
+      "rent": [23, 115, 330, 820, 1000, 1180]
+    },
+    {
+      "id": "irrlichtsumpf",
+      "name": "Irrlichtsumpf",
+      "type": "custom",
+      "tileType": "sumpf"
+    },
+    {
+      "id": "kristallpalast",
+      "name": "Kristallpalast",
+      "type": "property",
+      "group": "koenig",
+      "price": 320,
+      "houseCost": 200,
+      "rent": [29, 145, 430, 980, 1180, 1380]
+    },
+    {
+      "id": "orakel-3",
+      "name": "Orakel",
+      "type": "card",
+      "deck": "orakel"
+    },
+    {
+      "id": "thronsaal",
+      "name": "Thronsaal",
+      "type": "property",
+      "group": "koenig",
+      "price": 380,
+      "houseCost": 200,
+      "rent": [38, 185, 530, 1160, 1395, 1605]
+    },
+    {
+      "id": "koenigszoll",
+      "name": "Königszoll",
+      "type": "tax",
+      "amount": 150
+    }
+  ],
+  "decks": [
+    {
+      "id": "orakel",
+      "name": "Orakel",
+      "color": "#a855f7",
+      "cards": [
+        {
+          "id": "weltenbaum",
+          "text": "Der Wind trägt dich zum Weltenbaum.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "weltenbaum"
+            }
+          ]
+        },
+        {
+          "id": "thronsaal",
+          "text": "Audienz beim König: Zieh vor bis zum Thronsaal.",
+          "effects": [
+            {
+              "kind": "moveTo",
+              "tile": "thronsaal"
+            }
+          ]
+        },
+        {
+          "id": "reittier",
+          "text": "Ein Greif nimmt dich mit: Zieh vor zum nächsten Reittier. Gehört es jemandem, zahlst du doppelt.",
+          "effects": [
+            {
+              "kind": "moveToNearest",
+              "tileType": "station",
+              "rentMultiplier": 2
+            }
+          ]
+        },
+        {
+          "id": "portal",
+          "text": "Ein Riss im Gewebe der Welt: Spring zum nächsten Portal.",
+          "effects": [
+            {
+              "kind": "moveToNextOfType",
+              "tileType": "portal",
+              "passTiles": false,
+              "land": false
+            }
+          ]
+        },
+        {
+          "id": "kerker",
+          "text": "Du hast den falschen Zauberspruch gesagt: Ab in den Kerker.",
+          "effects": [
+            {
+              "kind": "goToJail"
+            }
+          ]
+        },
+        {
+          "id": "frei",
+          "text": "Ein Schlüssel aus Mondsilber: Du kommst aus dem Kerker frei. Behalte diese Karte.",
+          "effects": [
+            {
+              "kind": "jailFreeCard"
+            }
+          ]
+        },
+        {
+          "id": "heldentat",
+          "text": "Heldentat vollbracht! Dein Ruhm wächst um 2.",
+          "effects": [
+            {
+              "kind": "setVariable",
+              "variable": "ruhm",
+              "op": "add",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "id": "lied",
+          "text": "Die Barden singen von dir: Erhalte 10 von jedem Mitspieler.",
+          "effects": [
+            {
+              "kind": "collectFromEach",
+              "amount": 10
+            }
+          ]
+        },
+        {
+          "id": "zwergengold",
+          "text": "Zwergengold gefunden: Erhalte 120.",
+          "effects": [
+            {
+              "kind": "collect",
+              "amount": 120
+            }
+          ]
+        },
+        {
+          "id": "fluch",
+          "text": "Ein Kobold leert deine Taschen: Zahle 10 % deines Goldes.",
+          "effects": [
+            {
+              "kind": "payPercent",
+              "percent": 10
+            }
+          ]
+        },
+        {
+          "id": "spende",
+          "text": "Du spendest für die Schatzkammer: Zahle 50, der Schatz wächst um 50.",
+          "effects": [
+            {
+              "kind": "pay",
+              "amount": 50
+            },
+            {
+              "kind": "setVariable",
+              "variable": "schatz",
+              "op": "add",
+              "value": 50
+            }
+          ]
+        },
+        {
+          "id": "turmbau",
+          "text": "Zaubertürme müssen gewartet werden: Zahle 20 pro Haus und 80 pro Hotel.",
+          "effects": [
+            {
+              "kind": "repairs",
+              "perHouse": 20,
+              "perHotel": 80
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
