@@ -9,7 +9,7 @@ Kontext für alle Agenten-Sitzungen an Menelgame. Erst lesen, dann arbeiten. Das
 - `packages/engine`: reine, deterministische Spiellogik ohne DOM- oder Netzwerkzugriff
 - `packages/packs`: mitgelieferte Board Packs (JSON) inkl. Validierung
 - `packages/protocol`: Nachrichten zwischen Browser und Spielraum (Zod-geprüft)
-- `packages/bots`: Bots (Stufen Leicht und Mittel), reine Funktionen über der Engine
+- `packages/bots`: Bots (Stufen Leicht, Mittel, Schwer), reine Funktionen über der Engine
 - `apps/web`: React + Vite, i18next für alle Texte
 - `apps/server`: Cloudflare Worker + ein Durable Object pro Spielraum (Wrangler), D1 für Profile, Packs und Regelsets, R2 für Bilder
 - Vitest, ESLint (Flat Config), Prettier
@@ -59,13 +59,13 @@ apps/
     board/            Brett-Geometrie (Quadrat, Rechteck, Ring, Pfad) und Rendering
     components/       UI-Bausteine (GameScreen, ActionBar, AuctionPanel, TradePanel, EffectEditor, …)
     editor/           Brett-Editor (Ziehen & Ablegen), Feldtypen-Baukasten, Aussehen, Bild-Upload
-    game/             Hooks: useHotSeatGame, useOnlineRoom; Formatierung
-    pages/            Home, HotSeatPage, RoomPage, Lobby, MyPacksPage, PackEditorPage, SharedPackPage
+    game/             Hooks: useHotSeatGame, useOnlineRoom, useSettings; Formatierung; Töne (Web Audio)
+    pages/            Home, HotSeatPage, RoomPage, Lobby, MyPacksPage, PackEditorPage, SharedPackPage, StatsPage
     locales/          Sprachdateien (de.json)
   server/
     src/index.ts      Worker: /api/rooms, /api/rooms/<code>[/log], /r/<code>/ws, Assets
     src/api.ts        /api/profile, /api/packs, /api/rulesets (D1), /api/images (R2) + Tests mit node:sqlite
-    migrations/       D1-Schema
+    migrations/       D1-Schema (0001 Profile/Packs/Regelsets, 0002 Statistik/Erfolge)
     src/room.ts       Raum-Logik ohne Cloudflare-APIs (Lobby, Host, Bots, Uhren) + Tests
     wrangler.jsonc
 packages/
@@ -75,7 +75,8 @@ packages/
     index.ts          decideBot(state, playerId, level, memory)
     view.ts           botView (ohne Würfel-Zukunft und Kartenreihenfolge), Gedächtnis
     valuation.ts      Feldwerte, Reserve, Tauschbewertung
-    easy.ts, medium.ts  Stufen
+    easy.ts, medium.ts, hard.ts  Stufen
+    landing.ts        Landewahrscheinlichkeiten per Engine-Simulation (pro Brett zwischengespeichert)
   engine/src/
     apply.ts          apply, getLegalActions, getDefaultAction
     actions.ts        Validierung + Ausführung pro Aktionstyp
@@ -85,12 +86,14 @@ packages/
     turn.ts           Phasenwechsel, Zugende, Siegbedingungen
     auction.ts        Versteigerungen
     trade.ts          Handel (Angebot, Gegenangebot, Annahme)
+    agreements.ts     Vereinbarungen mit Laufzeit (Mietfreiheit, Raten, Gewinnbeteiligung)
+    stats.ts          Auswertung eines Spiels für Statistik und Erfolge
     host.ts           Systemaktionen UPDATE_RULES, REMOVE_PLAYER
     bankruptcy.ts     Ausscheiden (Bankrott, entfernt)
     create.ts         Startzustand
     replay.ts         Replay aus Log
     test/             Testhilfen (rigDice, landOn, …) und Test-Strategie
-  packs/src/          standard.json („Neustadt“, 40 Felder), generator.ts (Zufallsbrett) + Export
+  packs/src/          standard.json („Neustadt“), wien.json, fantasy.json, generator.ts (Zufallsbrett) + Export
 docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 ```
 
@@ -106,7 +109,9 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 - Feldverhalten läuft über die Feldtyp-Registry (`tileTypes.ts`), die deklarative Effekte liefert. Kein `switch` auf Feldnamen. Karten nutzen dieselben Effekte.
 - Eigene Feldtypen (`pack.tileTypes`) sind reine Daten: Auslöser (`land`, `pass`, `turnStart`, `turnEnd`, `roundEnd`), Bedingungen, Effekte. Zufall in Bedingungen (`chance`) kommt aus `state.rng`. Neue Effekt- oder Bedingungsarten brauchen Schema, Engine, Bot-Schätzung (`estimateEffects`), Beschreibung (`format.ts`) und Editor (`EffectEditor`).
 - Geldbeträge sind ganze Zahlen.
-- Erweiterungspunkte: `state.agreements` (Vereinbarungen mit Laufzeit, Phase 6), `TradeOffer` (später um Vereinbarungen erweiterbar), `getLegalActions(state, playerId)` und `getDefaultAction` (Bots).
+- Vereinbarungen (`state.agreements`) entstehen nur aus angenommenen Tauschangeboten (`TradeOffer.terms`), zählen am Rundenende herunter und enden bei Bankrott eines Beteiligten.
+- Variablen (`pack.variables`, `state.variables`) sind ganze Zahlen pro Spieler oder fürs Spiel; nur Effekte (`setVariable`, `collectVariable`) ändern sie.
+- Erweiterungspunkte: `getLegalActions(state, playerId)` und `getDefaultAction` (Bots, Zugtimer).
 
 ## Architekturregeln für den Server
 
@@ -122,7 +127,8 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 
 - Bots sehen nur, was Menschen sehen (`botView`): kein Zufallszustand, keine Kartenreihenfolge. Ein Test prüft, dass Entscheidungen davon unabhängig sind.
 - Bots sind deterministisch (Pseudozufall aus Spielstand und Spieler) und liefern nur gültige Aktionen; ist eine Idee ungültig, fällt der Bot auf eine sichere Aktion zurück.
-- Die Bewertung ist bewusst einfach und billig (keine Simulationen) wegen des CPU-Limits im Worker. Stufe Schwer mit Simulationen kommt in Phase 6.
+- Leicht und Mittel rechnen billig ohne Simulation. Schwer simuliert einmal pro Brett rund 800 Würfe mit der Engine (etwa 0,1 s) und merkt sich das Ergebnis; jede Entscheidung bleibt danach billig (CPU-Limit im Worker).
+- Änderungen an Bots mit einem Turnier prüfen (viele Seeds, Plätze abwechselnd); Schwer soll Mittel klar schlagen.
 
 ## Stand
 
@@ -131,7 +137,7 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 - **Phase 3 umgesetzt:** Bots Leicht und Mittel, Bot-Plätze in der Lobby, Vertretung abwesender Spieler nach einstellbarer Zeit, Ausführung per Alarm. Spiele nur mit Bots laufen ohne Hänger bis zum Ende (Tests, Stresstest über 200 Seeds).
 - **Phase 4 umgesetzt:** Profile mit Wiederherstellungscode, eigene Packs und Regelsets in D1, Teilen-Links (widerrufbar), Inhalts-Editor mit Import/Export, Regel-Panel, eigene Packs in Lobby und Hot-Seat, geheime Lobby-Karten.
 - **Phase 5 umgesetzt:** Brett-Editor (Felder ziehen, einfügen, löschen; Formen Quadrat, Rechteck, Ring, Pfad), Effekt-Baukasten für eigene Feldtypen mit Vorlagen (Teleporter, Kreuzung, Baustelle), Aussehen und Bilder (R2), Testmodus gegen Bots im Browser, Zufallsbrett-Generator.
-- Nächste Phase: Feinschliff (Phase 6), siehe docs/KONZEPT.md.
+- **Phase 6 umgesetzt:** Vereinbarungen im Handel (Mietfreiheit, Ratenzahlung, Gewinnbeteiligung), Bot Schwer, Figuren laufen Feld für Feld, abschaltbare Töne, Replay-Ansicht, Statistik mit Erfolgen und Titeln in D1, Variablen für eigene Feldtypen, Packs Wien-Edition und Fantasy-Welt.
 
 ## Arbeitsweise
 

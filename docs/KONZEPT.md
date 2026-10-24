@@ -35,14 +35,14 @@ Eigene Feldtypen und Karten beschreiben ihre Logik **deklarativ** als Auslöser 
 
 1. **Engine (lokal spielbar)** – Schema, deterministische Engine, Standard-Pack, Hot-Seat-Oberfläche.
 2. **Multiplayer** – Worker + Durable Object, Lobby, Raumcode, Reconnect, Auktionen, einfacher Handel, Host-Rechte, Zugtimer.
-3. **Bots** – Stufen Leicht und Mittel, Ausführung per Alarm, Vertretung abwesender Spieler.
+3. **Bots** – Stufen Leicht und Mittel (Schwer folgt in Phase 6), Ausführung per Alarm, Vertretung abwesender Spieler.
 4. **Anpassung I** – Profile, D1, „Meine Packs“, Regel-Panel, Regelsets, Inhalts-Editor, Teilen-Links, eigene Lobby-Karten.
 5. **Anpassung II** – Brett-Editor, Effekt-Baukasten, Testmodus, Zufallsbrett-Generator.
 6. **Feinschliff** – erweiterter Handel (Mietfreiheit, Ratenzahlung, Gewinnbeteiligung), Bot Schwer, Animationen, Sound, Replay-Ansicht, Statistiken, Variablen, weitere Packs.
 
-Stand: Phase 1 bis 5 sind umgesetzt. Für Phase 6 gibt es diese Anknüpfungspunkte:
+Stand: Alle sechs Phasen sind umgesetzt. Ideen für danach:
 
-- **Bot Schwer:** `@menelgame/bots` hat eine Strategie-Schnittstelle; eine weitere Stufe kann Landewahrscheinlichkeiten per Engine simulieren.
-- **Vereinbarungen mit Laufzeit:** `state.agreements` und `TradeOffer` sind dafür vorgesehen.
-- **Replay-Ansicht:** Startzustand + Aktionsliste ergibt exakt denselben Endzustand; der Server liefert das Log nach Spielende.
-- **Variablen für eigene Feldtypen:** Bedingungen und Effekte sind Zod-Unions und lassen sich um Zähler pro Spieler erweitern.
+- **Englisch:** Alle Texte liegen in `apps/web/src/locales/de.json`; eine `en.json` und eine Sprachwahl genügen.
+- **Auslöser „Kauf“ für eigene Feldtypen:** braucht einen eigenen Schritt im Kauf-Ablauf.
+- **Statistik für Hot-Seat-Spiele:** lokal ließe sich nichts fälschungssicher prüfen; deshalb zählen bisher nur Online-Spiele.
+- **Rotierte Felder auf dem Ring:** Achsparallele Kacheln brauchen viel Abstand; bei vielen Feldern ist ein Quadrat besser lesbar.
