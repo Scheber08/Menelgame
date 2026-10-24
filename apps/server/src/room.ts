@@ -13,17 +13,25 @@ import { builtInPacks, standardPack } from '@menelgame/packs';
 import {
   BOT_NAMES,
   ClientMessageSchema,
+  LOBBY_CARD_PREFIX,
+  lobbyCardMaxAmount,
+  MAX_CUSTOM_PACK_BYTES,
   PLAYER_COLORS,
+  publicGameState,
   withPlayer,
   type BotLevel,
   type ClientMessage,
   type Deadline,
   type ErrorCode,
+  type LobbyCard,
+  type LobbyCardRules,
   type RoomView,
   type ServerMessage,
 } from '@menelgame/protocol';
 import {
+  BoardPackSchema,
   DiceSchema,
+  parseBoardPack,
   RulesSchema,
   type BoardPack,
   type DiceConfig,
@@ -50,10 +58,15 @@ export interface RoomData {
   seats: Seat[];
   nextSeat: number;
   packId: string;
+  /** Eigenes Pack als Schnappschuss; null = mitgeliefertes Pack `packId`. */
+  customPack: BoardPack | null;
   rules: Rules;
   dice: DiceConfig;
   paused: boolean;
   deadline: Deadline | null;
+  lobbyCardRules: LobbyCardRules;
+  /** Geheime Karten je Platz; kommen beim Start in die Kartenstapel. */
+  lobbyCards: Record<string, LobbyCard[]>;
   /** Nach so vielen Sekunden ohne Verbindung spielt ein Bot für den Menschen; null = nie. */
   botTakeoverSeconds: number | null;
   /** Nächster Bot-Zug (die Verzögerung macht Bot-Züge für Menschen nachvollziehbar). */
@@ -110,10 +123,13 @@ export function newRoomData(code: string, now: number): RoomData {
     seats: [],
     nextSeat: 1,
     packId: standardPack.meta.id,
+    customPack: null,
     rules: structuredClone(standardPack.rules),
     dice: structuredClone(standardPack.dice),
     paused: false,
     deadline: null,
+    lobbyCardRules: { enabled: true, maxAmount: 200 },
+    lobbyCards: {},
     botTakeoverSeconds: DEFAULT_TAKEOVER_SECONDS,
     botAt: null,
     createdAt: now,
@@ -135,15 +151,24 @@ export class Room {
     // Ältere gespeicherte Räume kannten noch keine Bots.
     data.botTakeoverSeconds ??= DEFAULT_TAKEOVER_SECONDS;
     data.botAt ??= null;
+    data.customPack ??= null;
+    data.lobbyCardRules ??= { enabled: true, maxAmount: 200 };
+    data.lobbyCards ??= {};
     for (const seat of data.seats) {
       seat.bot ??= null;
       seat.disconnectedAt ??= null;
     }
   }
 
+  /** Das gewählte Pack: eigenes Schnappschuss-Pack oder ein mitgeliefertes. */
+  pack(): BoardPack {
+    return this.data.customPack ?? findPack(this.data.packId) ?? standardPack;
+  }
+
   view(): RoomView {
     const online = new Set(this.host.connections().map((c) => c.seatId));
     const now = this.host.now();
+    const pack = this.pack();
     return {
       code: this.data.code,
       status: this.data.status,
@@ -157,11 +182,23 @@ export class Room {
         standIn: s.bot === null && this.isStandIn(s, now),
       })),
       packId: this.data.packId,
+      pack: {
+        name: pack.meta.name,
+        tiles: pack.tiles.map((t) => ({ id: t.id, name: t.name })),
+        maxPlayers: pack.maxPlayers,
+        custom: this.data.customPack !== null,
+      },
       rules: this.data.rules,
       dice: this.data.dice,
       paused: this.data.paused,
       deadline: this.data.deadline,
       botTakeoverSeconds: this.data.botTakeoverSeconds,
+      lobbyCards: {
+        ...this.data.lobbyCardRules,
+        counts: Object.fromEntries(
+          Object.entries(this.data.lobbyCards).map(([seat, cards]) => [seat, cards.length]),
+        ),
+      },
       serverTime: now,
     };
   }
@@ -211,9 +248,17 @@ export class Room {
       case 'addBot':
         return this.addBot(conn, message.level);
       case 'configure':
-        return this.configure(conn, message.packId, message.rules, message.dice);
+        return this.configure(
+          conn,
+          message.packId,
+          message.rules,
+          message.dice,
+          message.customPack,
+        );
       case 'roomSettings':
-        return this.roomSettings(conn, message.botTakeoverSeconds);
+        return this.roomSettings(conn, message.botTakeoverSeconds, message.lobbyCards);
+      case 'setLobbyCards':
+        return this.setLobbyCards(conn, message.cards);
       case 'start':
         return this.start(conn);
       case 'action':
@@ -283,11 +328,13 @@ export class Room {
     if (this.game) {
       this.host.send(conn.id, {
         t: 'game',
-        state: this.game.state,
+        state: publicGameState(this.game.state),
         events: this.game.events,
         reset: true,
       });
     }
+    const myCards = seat ? this.data.lobbyCards[seat.id] : undefined;
+    if (myCards) this.host.send(conn.id, { t: 'myLobbyCards', cards: myCards });
     if (seat) {
       this.scheduleBots();
       this.persistRoom();
@@ -352,37 +399,108 @@ export class Room {
     this.broadcastRoom();
   }
 
-  private configure(conn: Connection, packId: string, rules: unknown, dice: unknown): void {
+  private configure(
+    conn: Connection,
+    packId: string,
+    rules: unknown,
+    dice: unknown,
+    customPack?: unknown,
+  ): void {
     if (!this.isHost(conn)) return this.error(conn.id, 'notHost');
     if (this.data.status !== 'lobby') return this.error(conn.id, 'notInLobby');
-    const pack = findPack(packId);
+    let pack: BoardPack | undefined;
+    let custom: BoardPack | null = null;
+    if (customPack !== undefined) {
+      if (JSON.stringify(customPack).length > MAX_CUSTOM_PACK_BYTES)
+        return this.error(conn.id, 'invalidPack');
+      const parsed = parseBoardPack(customPack);
+      if (!parsed.ok) return this.error(conn.id, 'invalidPack');
+      pack = custom = parsed.pack;
+    } else if (this.data.customPack && packId === this.data.packId) {
+      // Nur Regeln geändert: das eigene Pack bleibt.
+      pack = custom = this.data.customPack;
+    } else {
+      pack = findPack(packId);
+    }
     if (!pack) return this.error(conn.id, 'unknownPack');
     const parsedRules = RulesSchema.safeParse(rules);
     const parsedDice = DiceSchema.safeParse(dice);
     if (!parsedRules.success || !parsedDice.success) return this.error(conn.id, 'invalidRules');
     if (this.data.seats.length > pack.maxPlayers) return this.error(conn.id, 'tooManyPlayers');
     this.data.packId = pack.meta.id;
+    this.data.customPack = custom;
     this.data.rules = parsedRules.data;
     this.data.dice = parsedDice.data;
     this.persistRoom();
     this.broadcastRoom();
   }
 
-  private roomSettings(conn: Connection, botTakeoverSeconds: number | null): void {
+  private roomSettings(
+    conn: Connection,
+    botTakeoverSeconds: number | null | undefined,
+    lobbyCards: LobbyCardRules | undefined,
+  ): void {
     if (!this.isHost(conn)) return this.error(conn.id, 'notHost');
-    this.data.botTakeoverSeconds = botTakeoverSeconds;
+    if (botTakeoverSeconds !== undefined) this.data.botTakeoverSeconds = botTakeoverSeconds;
+    if (lobbyCards !== undefined) {
+      if (this.data.status !== 'lobby') return this.error(conn.id, 'notInLobby');
+      this.data.lobbyCardRules = lobbyCards;
+    }
     this.scheduleBots();
     this.persistRoom();
     this.broadcastRoom();
+  }
+
+  private setLobbyCards(conn: Connection, cards: LobbyCard[]): void {
+    if (this.data.status !== 'lobby') return this.error(conn.id, 'notInLobby');
+    if (!conn.seatId) return this.error(conn.id, 'notSeated');
+    if (!this.data.lobbyCardRules.enabled) return this.error(conn.id, 'lobbyCardsDisabled');
+    if (cards.some((c) => lobbyCardMaxAmount(c) > this.data.lobbyCardRules.maxAmount))
+      return this.error(conn.id, 'lobbyCardTooExpensive');
+    const tiles = new Set(this.pack().tiles.map((t) => t.id));
+    if (cards.some((c) => c.effects.some((e) => e.kind === 'moveTo' && !tiles.has(e.tile))))
+      return this.error(conn.id, 'unknownTile');
+    this.data.lobbyCards[conn.seatId] = cards;
+    this.persistRoom();
+    this.host.send(conn.id, { t: 'myLobbyCards', cards });
+    this.broadcastRoom();
+  }
+
+  /**
+   * Pack für das Spiel: Schnappschuss des gewählten Packs plus die geheimen Lobby-Karten,
+   * reihum auf die vorhandenen Stapel verteilt. Karten, die (nach einem Packwechsel) nicht
+   * mehr passen, fallen weg.
+   */
+  private gamePack(): BoardPack {
+    const pack = this.pack();
+    const rules = this.data.lobbyCardRules;
+    if (!rules.enabled || pack.decks.length === 0) return pack;
+    const tiles = new Set(pack.tiles.map((t) => t.id));
+    const decks = structuredClone(pack.decks);
+    let next = 0;
+    for (const seat of this.data.seats) {
+      (this.data.lobbyCards[seat.id] ?? []).forEach((card, i) => {
+        const fits =
+          lobbyCardMaxAmount(card) <= rules.maxAmount &&
+          card.effects.every((e) => e.kind !== 'moveTo' || tiles.has(e.tile));
+        if (!fits) return;
+        decks[next++ % decks.length]!.cards.push({
+          id: `${LOBBY_CARD_PREFIX}${seat.id}-${i + 1}`,
+          text: card.text,
+          effects: card.effects.map((e) => (e.kind === 'moveTo' ? { ...e, passTiles: true } : e)),
+        });
+      });
+    }
+    const parsed = BoardPackSchema.safeParse({ ...pack, decks });
+    return parsed.success ? parsed.data : pack;
   }
 
   private start(conn: Connection): void {
     if (!this.isHost(conn)) return this.error(conn.id, 'notHost');
     if (this.data.status !== 'lobby') return this.error(conn.id, 'notInLobby');
     if (this.data.seats.length < 2) return this.error(conn.id, 'tooFewPlayers');
-    const pack = findPack(this.data.packId) ?? standardPack;
     const initial = createGame({
-      pack,
+      pack: this.gamePack(),
       rules: this.data.rules,
       dice: this.data.dice,
       seed: this.host.randomSeed(),
@@ -394,7 +512,7 @@ export class Room {
     this.scheduleBots();
     this.host.saveGame(this.game, []);
     this.persistRoom();
-    this.broadcast({ t: 'game', state: initial, events: [], reset: true });
+    this.broadcast({ t: 'game', state: publicGameState(initial), events: [], reset: true });
     this.broadcastRoom();
   }
 
@@ -415,6 +533,7 @@ export class Room {
 
     if (this.data.status === 'lobby') {
       this.data.seats = this.data.seats.filter((s) => s.id !== seatId);
+      delete this.data.lobbyCards[seatId];
       for (const c of this.host.connections().filter((c) => c.seatId === seatId)) {
         this.host.assignSeat(c.id, null);
         this.error(c.id, 'kicked');
@@ -482,7 +601,12 @@ export class Room {
     this.scheduleBots();
     this.host.saveGame(game, [action]);
     this.persistRoom();
-    this.broadcast({ t: 'game', state: result.state, events: result.events, reset: false });
+    this.broadcast({
+      t: 'game',
+      state: publicGameState(result.state),
+      events: result.events,
+      reset: false,
+    });
     this.broadcastRoom();
   }
 
@@ -605,8 +729,7 @@ export class Room {
   // ---- Hilfen ---------------------------------------------------------------------------
 
   private isFull(): boolean {
-    const pack = findPack(this.data.packId) ?? standardPack;
-    return this.data.seats.length >= pack.maxPlayers;
+    return this.data.seats.length >= this.pack().maxPlayers;
   }
 
   private isHost(conn: Connection): boolean {

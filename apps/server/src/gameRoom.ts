@@ -2,7 +2,6 @@ import type { Action } from '@menelgame/engine';
 import type { RoomInfoResponse, ServerMessage } from '@menelgame/protocol';
 import { DurableObject } from 'cloudflare:workers';
 import {
-  findPack,
   newRoomData,
   Room,
   type Connection,
@@ -14,6 +13,7 @@ import {
 export interface Env {
   ROOMS: DurableObjectNamespace<GameRoom>;
   ASSETS: Fetcher;
+  DB: D1Database;
 }
 
 interface Attachment {
@@ -72,12 +72,16 @@ export class GameRoom extends DurableObject<Env> implements RoomHost {
       code: data.code,
       status: data.status,
       seats: data.seats.length,
-      maxPlayers: findPack(data.packId)?.maxPlayers ?? 0,
+      maxPlayers: this.room.pack().maxPlayers,
     };
   }
 
-  /** Vollständiges Log (Startzustand + Aktionen), z. B. zum Export. */
-  async log(): Promise<{ initial: unknown; actions: Action[] } | null> {
+  /**
+   * Vollständiges Log (Startzustand + Aktionen) zum Export und Nachspielen. Erst nach
+   * Spielende, weil der Startzustand den Zufallsgenerator enthält.
+   */
+  async log(): Promise<{ initial: unknown; actions: Action[] } | 'notFinished' | null> {
+    if (this.room && this.room.data.status !== 'finished') return 'notFinished';
     const initial = await this.ctx.storage.get('initial');
     if (!initial) return null;
     const actions = this.ctx.storage.sql

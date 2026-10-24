@@ -95,6 +95,46 @@ export function withPlayer(input: ActionInput, playerId: PlayerId): PlayerAction
 
 export const SeatNameSchema = z.string().trim().min(1).max(20);
 
+/** Geheime Lobby-Karten: einfache feste Aktionen, Beträge begrenzt durch den Host. */
+export const MAX_LOBBY_CARDS = 2;
+
+export const LobbyCardEffectSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('collect'), amount: Money }),
+  z.object({ kind: z.literal('pay'), amount: Money }),
+  z.object({ kind: z.literal('collectFromEach'), amount: Money }),
+  z.object({ kind: z.literal('payEach'), amount: Money }),
+  z.object({ kind: z.literal('moveTo'), tile: Id }),
+  z.object({ kind: z.literal('moveBy'), steps: z.int().min(-12).max(12) }),
+  z.object({ kind: z.literal('goToJail') }),
+  z.object({ kind: z.literal('jailFreeCard') }),
+]);
+
+export const LobbyCardSchema = z.object({
+  text: z.string().trim().min(1).max(160),
+  effects: z.array(LobbyCardEffectSchema).min(1).max(3),
+});
+
+export type LobbyCard = z.infer<typeof LobbyCardSchema>;
+export type LobbyCardEffect = z.infer<typeof LobbyCardEffectSchema>;
+
+export const LobbyCardRulesSchema = z.object({
+  enabled: z.boolean(),
+  /** Höchstbetrag pro Geld-Aktion. */
+  maxAmount: z.int().min(0).max(5000),
+});
+
+export type LobbyCardRules = z.infer<typeof LobbyCardRulesSchema>;
+
+/** Höchster Betrag einer Lobby-Karte (für die Prüfung gegen das Limit des Hosts). */
+export function lobbyCardMaxAmount(card: LobbyCard): number {
+  return Math.max(0, ...card.effects.map((e) => ('amount' in e ? e.amount : 0)));
+}
+
+export const LOBBY_CARD_PREFIX = 'lobby-';
+
+/** Größe eines eigenen Packs in einer WebSocket-Nachricht (wie bei der API). */
+export const MAX_CUSTOM_PACK_BYTES = 256 * 1024;
+
 export const ClientMessageSchema = z.discriminatedUnion('t', [
   /** Erste Nachricht: mit Token den eigenen Platz zurückholen, sonst zuschauen. */
   z.object({ t: z.literal('hello'), token: z.string().max(128).optional() }),
@@ -103,18 +143,25 @@ export const ClientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('updateSeat'), name: SeatNameSchema, color: ColorSchema }),
   /** Host in der Lobby: Bot-Platz hinzufügen. */
   z.object({ t: z.literal('addBot'), level: BotLevelSchema }),
-  /** Host: nach wie vielen Sekunden Abwesenheit ein Bot übernimmt (null = nie). */
+  /** Host: Bot-Vertretung (null = nie) und Lobby-Karten einstellen. */
   z.object({
     t: z.literal('roomSettings'),
-    botTakeoverSeconds: z.int().min(10).max(3600).nullable(),
+    botTakeoverSeconds: z.int().min(10).max(3600).nullable().optional(),
+    lobbyCards: LobbyCardRulesSchema.optional(),
   }),
-  /** Host in der Lobby: Brett und Regeln wählen. */
+  /**
+   * Host in der Lobby: Brett und Regeln wählen. Eigene Packs schickt der Browser vollständig
+   * mit; der Raum prüft und speichert sie als Schnappschuss.
+   */
   z.object({
     t: z.literal('configure'),
     packId: Id,
+    customPack: z.unknown().optional(),
     rules: z.unknown(),
     dice: z.unknown(),
   }),
+  /** Eigene geheime Lobby-Karten setzen (ersetzt die bisherigen). */
+  z.object({ t: z.literal('setLobbyCards'), cards: z.array(LobbyCardSchema).max(MAX_LOBBY_CARDS) }),
   z.object({ t: z.literal('start') }),
   z.object({ t: z.literal('action'), action: ActionInputSchema }),
   /** Host: Platz entfernen (Lobby) bzw. Spieler aus dem Spiel nehmen. */
@@ -150,11 +197,18 @@ export interface RoomView {
   hostSeatId: PlayerId | null;
   seats: SeatView[];
   packId: string;
+  pack: {
+    name: string;
+    tiles: { id: string; name: string }[];
+    maxPlayers: number;
+    custom: boolean;
+  };
   rules: Rules;
   dice: DiceConfig;
   paused: boolean;
   deadline: Deadline | null;
   botTakeoverSeconds: number | null;
+  lobbyCards: LobbyCardRules & { counts: Record<PlayerId, number> };
   /** Serverzeit beim Senden, damit Clients ihre Uhr abgleichen können. */
   serverTime: number;
 }
@@ -175,6 +229,10 @@ export type ErrorCode =
   | 'paused'
   | 'unknownSeat'
   | 'kicked'
+  | 'invalidPack'
+  | 'lobbyCardsDisabled'
+  | 'lobbyCardTooExpensive'
+  | 'unknownTile'
   | 'engine';
 
 export type ServerMessage =
@@ -186,6 +244,8 @@ export type ServerMessage =
    */
   | { t: 'game'; state: GameState; events: GameEvent[]; reset: boolean }
   | { t: 'error'; code: ErrorCode; engineCode?: string; message?: string }
+  /** Die eigenen Lobby-Karten (nur an den Besitzer). */
+  | { t: 'myLobbyCards'; cards: LobbyCard[] }
   | { t: 'pong'; serverTime: number };
 
 export interface CreateRoomResponse {
@@ -197,4 +257,28 @@ export interface RoomInfoResponse {
   status: RoomView['status'];
   seats: number;
   maxPlayers: number;
+}
+export * from './api';
+
+/**
+ * Zustand für Clients: ohne Zufallszustand (künftige Würfe), ohne Kartenreihenfolge und
+ * ohne Text geheimer Lobby-Karten. Gezogene Karten erscheinen weiterhin im Ereignis.
+ */
+export function publicGameState(state: GameState): GameState {
+  return {
+    ...state,
+    rng: { state: 0 },
+    decks: Object.fromEntries(Object.keys(state.decks).map((id) => [id, { drawPile: [] }])),
+    pack: {
+      ...state.pack,
+      decks: state.pack.decks.map((deck) => ({
+        ...deck,
+        cards: deck.cards.map((card) =>
+          card.id.startsWith(LOBBY_CARD_PREFIX)
+            ? { ...card, text: '???', effects: [{ kind: 'collect' as const, amount: 0 }] }
+            : card,
+        ),
+      })),
+    },
+  };
 }

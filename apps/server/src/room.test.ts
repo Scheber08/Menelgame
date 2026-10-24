@@ -1,5 +1,6 @@
 import { replay, type Action, type GameState } from '@menelgame/engine';
-import type { ClientMessage, ServerMessage } from '@menelgame/protocol';
+import { standardPack } from '@menelgame/packs';
+import { publicGameState, type ClientMessage, type ServerMessage } from '@menelgame/protocol';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   newRoomData,
@@ -238,7 +239,7 @@ describe('Spiel über den Raum', () => {
     expect(host.last('a2', 'welcome')).toMatchObject({ seatId: 'p1', token: tokenA });
     const snapshot = host.last('a2', 'game')!;
     expect(snapshot.reset).toBe(true);
-    expect(snapshot.state).toEqual(state());
+    expect(snapshot.state).toEqual(publicGameState(state()));
     expect(snapshot.events.length).toBeGreaterThan(0);
     expect(room.view().seats[0]!.connected).toBe(true);
     // Und kann weiterspielen.
@@ -494,5 +495,135 @@ describe('Bots im Raum', () => {
     expect(
       replay({ initial: host.saved.game!.initial, actions: host.saved.actions }).state,
     ).toEqual(room.game!.state);
+  });
+});
+
+describe('Eigene Packs und Lobby-Karten', () => {
+  function customPack(name = 'Testbrett') {
+    const pack = structuredClone(standardPack);
+    pack.meta = { ...pack.meta, id: 'eigen', name };
+    pack.tiles = pack.tiles.map((t) =>
+      t.id === 'fischergasse' ? { ...t, name: 'Meine Gasse' } : t,
+    );
+    return pack;
+  }
+
+  it('übernimmt ein eigenes Pack als Schnappschuss', () => {
+    lobbyWithTwo();
+    send('a', {
+      t: 'configure',
+      packId: 'eigen',
+      customPack: customPack(),
+      rules: room.data.rules,
+      dice: room.data.dice,
+    });
+    expect(room.view().pack).toMatchObject({ name: 'Testbrett', maxPlayers: 6, custom: true });
+    expect(room.view().pack.tiles[1]).toEqual({ id: 'fischergasse', name: 'Meine Gasse' });
+    send('a', { t: 'start' });
+    expect(room.game!.state.pack.tiles[1]!.name).toBe('Meine Gasse');
+  });
+
+  it('weist kaputte Packs ab', () => {
+    lobbyWithTwo();
+    const broken = customPack();
+    broken.tiles = broken.tiles.slice(0, 5);
+    send('a', {
+      t: 'configure',
+      packId: 'eigen',
+      customPack: broken,
+      rules: room.data.rules,
+      dice: room.data.dice,
+    });
+    expect(host.last('a', 'error')).toEqual({ t: 'error', code: 'invalidPack' });
+    expect(room.view().pack.custom).toBe(false);
+  });
+
+  it('mischt geheime Lobby-Karten in die Stapel und verrät sie nicht', () => {
+    lobbyWithTwo();
+    send('b', {
+      t: 'setLobbyCards',
+      cards: [
+        { text: 'Ben grüßt: Zahle 100.', effects: [{ kind: 'pay', amount: 100 }] },
+        { text: 'Ab zum Start!', effects: [{ kind: 'moveTo', tile: 'start' }] },
+      ],
+    });
+    expect(host.last('b', 'myLobbyCards')!.cards).toHaveLength(2);
+    // Andere sehen nur die Anzahl.
+    expect(room.view().lobbyCards.counts).toEqual({ p2: 2 });
+    expect(JSON.stringify(host.last('a', 'room'))).not.toContain('Ben grüßt');
+
+    send('a', { t: 'start' });
+    const decks = room.game!.state.pack.decks;
+    const lobby = decks.flatMap((d) => d.cards).filter((c) => c.id.startsWith('lobby-'));
+    expect(lobby.map((c) => c.id)).toEqual(['lobby-p2-1', 'lobby-p2-2']);
+    // Verteilt auf beide Stapel und im Zustand für Clients unkenntlich.
+    expect(decks.map((d) => d.cards.filter((c) => c.id.startsWith('lobby-')).length)).toEqual([
+      1, 1,
+    ]);
+    const sent = JSON.stringify(host.last('a', 'game'));
+    expect(sent).not.toContain('Ben grüßt');
+    expect(sent).not.toContain('Ab zum Start!');
+  });
+
+  it('hält sich an das Betragslimit des Hosts', () => {
+    lobbyWithTwo();
+    send('a', { t: 'roomSettings', lobbyCards: { enabled: true, maxAmount: 50 } });
+    send('b', {
+      t: 'setLobbyCards',
+      cards: [{ text: 'Teuer', effects: [{ kind: 'collectFromEach', amount: 80 }] }],
+    });
+    expect(host.last('b', 'error')).toEqual({ t: 'error', code: 'lobbyCardTooExpensive' });
+    send('a', { t: 'roomSettings', lobbyCards: { enabled: false, maxAmount: 50 } });
+    send('b', {
+      t: 'setLobbyCards',
+      cards: [{ text: 'Billig', effects: [{ kind: 'pay', amount: 10 }] }],
+    });
+    expect(host.last('b', 'error')).toEqual({ t: 'error', code: 'lobbyCardsDisabled' });
+  });
+
+  it('prüft Zielfelder und gibt die eigenen Karten nach einem Reconnect zurück', () => {
+    const { tokenB } = lobbyWithTwo();
+    send('b', {
+      t: 'setLobbyCards',
+      cards: [{ text: 'Weg', effects: [{ kind: 'moveTo', tile: 'nirgendwo' }] }],
+    });
+    expect(host.last('b', 'error')).toEqual({ t: 'error', code: 'unknownTile' });
+    send('b', {
+      t: 'setLobbyCards',
+      cards: [{ text: 'Gefängnis!', effects: [{ kind: 'goToJail' }] }],
+    });
+    connect('b2', tokenB);
+    expect(host.last('b2', 'myLobbyCards')!.cards[0]!.text).toBe('Gefängnis!');
+  });
+
+  it('verdeckt Würfel-Zukunft und Kartenreihenfolge für alle Clients', () => {
+    startGame();
+    const sent = host.last('a', 'game')!.state;
+    expect(sent.rng).toEqual({ state: 0 });
+    expect(Object.values(sent.decks).every((d) => d.drawPile.length === 0)).toBe(true);
+    expect(room.game!.state.rng.state).not.toBe(0);
+  });
+});
+
+describe('Eigenes Pack bleibt bei Regeländerungen', () => {
+  it('behält das eigene Pack, wenn nur Regeln geändert werden', () => {
+    lobbyWithTwo();
+    const pack = structuredClone(standardPack);
+    pack.meta = { ...pack.meta, id: 'eigen', name: 'Eigen' };
+    send('a', {
+      t: 'configure',
+      packId: 'eigen',
+      customPack: pack,
+      rules: room.data.rules,
+      dice: room.data.dice,
+    });
+    send('a', {
+      t: 'configure',
+      packId: 'eigen',
+      rules: { ...room.data.rules, startingCash: 999 },
+      dice: room.data.dice,
+    });
+    expect(room.view().pack).toMatchObject({ name: 'Eigen', custom: true });
+    expect(room.data.rules.startingCash).toBe(999);
   });
 });
