@@ -11,7 +11,7 @@ Kontext für alle Agenten-Sitzungen an Menelgame. Erst lesen, dann arbeiten. Das
 - `packages/protocol`: Nachrichten zwischen Browser und Spielraum (Zod-geprüft)
 - `packages/bots`: Bots (Stufen Leicht und Mittel), reine Funktionen über der Engine
 - `apps/web`: React + Vite, i18next für alle Texte
-- `apps/server`: Cloudflare Worker + ein Durable Object pro Spielraum (Wrangler), D1 für Profile, Packs und Regelsets
+- `apps/server`: Cloudflare Worker + ein Durable Object pro Spielraum (Wrangler), D1 für Profile, Packs und Regelsets, R2 für Bilder
 - Vitest, ESLint (Flat Config), Prettier
 
 Die Pakete werden als TypeScript-Quellcode konsumiert (`exports` zeigt auf `src/index.ts`). Vite, Vitest und Wrangler bündeln selbst; `build` in den Paketen ist daher eine reine Typprüfung.
@@ -37,9 +37,10 @@ Im Dev-Modus leitet Vite `/api/*` und `/r/<code>/ws` an `wrangler dev` weiter. O
 1. Kostenloses Cloudflare-Konto anlegen.
 2. Einmalig anmelden: `pnpm --filter @menelgame/server exec wrangler login`
 3. D1-Datenbank einmalig anlegen: `pnpm --filter @menelgame/server exec wrangler d1 create menelgame` und die ausgegebene `database_id` in `apps/server/wrangler.jsonc` eintragen.
-4. Hochladen: `pnpm deploy`. Das wendet die D1-Migrationen (`apps/server/migrations`) remote an, legt den Worker `menelgame` an, lädt `apps/web/dist` als statische Assets hoch und führt die Durable-Object-Migration `v1` (SQLite) aus.
-5. Die App ist dann unter `https://menelgame.<dein-subdomain>.workers.dev` erreichbar. Einladungslinks haben die Form `/r/<CODE>`.
-6. Logs live ansehen: `pnpm --filter @menelgame/server exec wrangler tail`.
+4. R2-Bucket für Bilder einmalig anlegen: `pnpm --filter @menelgame/server exec wrangler r2 bucket create menelgame-images` (R2 muss im Dashboard einmal aktiviert sein; 10 GB sind frei).
+5. Hochladen: `pnpm deploy`. Das wendet die D1-Migrationen (`apps/server/migrations`) remote an, legt den Worker `menelgame` an, lädt `apps/web/dist` als statische Assets hoch und führt die Durable-Object-Migration `v1` (SQLite) aus.
+6. Die App ist dann unter `https://menelgame.<dein-subdomain>.workers.dev` erreichbar. Einladungslinks haben die Form `/r/<CODE>`.
+7. Logs live ansehen: `pnpm --filter @menelgame/server exec wrangler tail`.
 
 Konfiguration: [apps/server/wrangler.jsonc](apps/server/wrangler.jsonc). Der Free Plan erlaubt nur SQLite-gestützte Durable Objects (`new_sqlite_classes`); Tageslimits (Requests, geschriebene Zeilen) stehen in der Cloudflare-Doku. Pro Spielaktion schreibt ein Raum etwa vier Zeilen.
 
@@ -48,20 +49,20 @@ Konfiguration: [apps/server/wrangler.jsonc](apps/server/wrangler.jsonc). Der Fre
 ```text
 apps/
   web/src/
-    board/            Brett-Geometrie und SVG-Rendering
-    components/       UI-Bausteine (GameScreen, ActionBar, AuctionPanel, TradePanel, …)
+    board/            Brett-Geometrie (Quadrat, Rechteck, Ring, Pfad) und Rendering
+    components/       UI-Bausteine (GameScreen, ActionBar, AuctionPanel, TradePanel, EffectEditor, …)
+    editor/           Brett-Editor (Ziehen & Ablegen), Feldtypen-Baukasten, Aussehen, Bild-Upload
     game/             Hooks: useHotSeatGame, useOnlineRoom; Formatierung
     pages/            Home, HotSeatPage, RoomPage, Lobby, MyPacksPage, PackEditorPage, SharedPackPage
     locales/          Sprachdateien (de.json)
   server/
     src/index.ts      Worker: /api/rooms, /api/rooms/<code>[/log], /r/<code>/ws, Assets
-    src/api.ts        /api/profile, /api/packs, /api/rulesets (D1) + Tests mit node:sqlite
+    src/api.ts        /api/profile, /api/packs, /api/rulesets (D1), /api/images (R2) + Tests mit node:sqlite
     migrations/       D1-Schema
-    src/gameRoom.ts   Durable Object: WebSocket-Hibernation, Speicher, Alarm
     src/room.ts       Raum-Logik ohne Cloudflare-APIs (Lobby, Host, Bots, Uhren) + Tests
     wrangler.jsonc
 packages/
-  schema/src/         Zod-Schemas: pack.ts, rules.ts, tiles.ts, effects.ts
+  schema/src/         Zod-Schemas: pack.ts, rules.ts, tiles.ts, effects.ts, customTypes.ts
   protocol/src/       ClientMessage, ServerMessage, RoomView, ActionInput, Bot-Namen, Farben
   bots/src/
     index.ts          decideBot(state, playerId, level, memory)
@@ -73,7 +74,7 @@ packages/
     actions.ts        Validierung + Ausführung pro Aktionstyp
     handler.ts        Handler-Typ, Akteure (acting/anyPlayer/system), Fehlertexte
     effects.ts        Effekt-Interpreter, Bewegung, Karten, Miete fällig
-    tileTypes.ts      Feldtyp-Registry (onLand/onPass → Effekte)
+    tileTypes.ts      Feldtyp-Registry (onLand/onPass → Effekte), eigene Typen über Regeln
     turn.ts           Phasenwechsel, Zugende, Siegbedingungen
     auction.ts        Versteigerungen
     trade.ts          Handel (Angebot, Gegenangebot, Annahme)
@@ -82,7 +83,7 @@ packages/
     create.ts         Startzustand
     replay.ts         Replay aus Log
     test/             Testhilfen (rigDice, landOn, …) und Test-Strategie
-  packs/src/          standard.json („Neustadt“, 40 Felder) + Export
+  packs/src/          standard.json („Neustadt“, 40 Felder), generator.ts (Zufallsbrett) + Export
 docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 ```
 
@@ -94,8 +95,9 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 - Zufall nur über den gesetzten PRNG (mulberry32) in `state.rng`. Kein `Math.random`, kein `Date` in der Engine (ESLint verbietet beides).
 - Die Engine kennt keine Zeit. Uhren (Zugtimer, Auktionsende) laufen im Server bzw. in der Hot-Seat-Oberfläche und lösen Aktionen aus.
 - Ereignis-Log: `replay({ initial, actions })` muss exakt denselben Endzustand ergeben – auch mit System- und Host-Aktionen.
-- Zugphasen als expliziter Zustandsautomat in `state.phase`: `awaitingRoll`, `awaitingPurchase`, `freePhase`, `awaitingDebt`, `auction`, `gameOver`. Feldauflösung passiert synchron innerhalb von `apply`.
+- Zugphasen als expliziter Zustandsautomat in `state.phase`: `awaitingRoll`, `awaitingPurchase`, `freePhase`, `awaitingDebt`, `auction`, `awaitingChoice`, `gameOver`. Feldauflösung passiert synchron innerhalb von `apply`.
 - Feldverhalten läuft über die Feldtyp-Registry (`tileTypes.ts`), die deklarative Effekte liefert. Kein `switch` auf Feldnamen. Karten nutzen dieselben Effekte.
+- Eigene Feldtypen (`pack.tileTypes`) sind reine Daten: Auslöser (`land`, `pass`, `turnStart`, `turnEnd`, `roundEnd`), Bedingungen, Effekte. Zufall in Bedingungen (`chance`) kommt aus `state.rng`. Neue Effekt- oder Bedingungsarten brauchen Schema, Engine, Bot-Schätzung (`estimateEffects`), Beschreibung (`format.ts`) und Editor (`EffectEditor`).
 - Geldbeträge sind ganze Zahlen.
 - Erweiterungspunkte: `state.agreements` (Vereinbarungen mit Laufzeit, Phase 6), `TradeOffer` (später um Vereinbarungen erweiterbar), `getLegalActions(state, playerId)` und `getDefaultAction` (Bots).
 
@@ -121,7 +123,8 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 - **Phase 2 umgesetzt:** Worker + Durable Object, Lobby mit Raumcode und Einladungslink, Reconnect, Auktionen, einfacher Handel, Host-Rechte (entfernen, pausieren, Regeln live), Zugtimer. Lokal mit mehreren Clients getestet; das Deployment braucht ein Cloudflare-Konto.
 - **Phase 3 umgesetzt:** Bots Leicht und Mittel, Bot-Plätze in der Lobby, Vertretung abwesender Spieler nach einstellbarer Zeit, Ausführung per Alarm. Spiele nur mit Bots laufen ohne Hänger bis zum Ende (Tests, Stresstest über 200 Seeds).
 - **Phase 4 umgesetzt:** Profile mit Wiederherstellungscode, eigene Packs und Regelsets in D1, Teilen-Links (widerrufbar), Inhalts-Editor mit Import/Export, Regel-Panel, eigene Packs in Lobby und Hot-Seat, geheime Lobby-Karten.
-- Nächste Phase: Anpassung II (Phase 5), siehe docs/KONZEPT.md.
+- **Phase 5 umgesetzt:** Brett-Editor (Felder ziehen, einfügen, löschen; Formen Quadrat, Rechteck, Ring, Pfad), Effekt-Baukasten für eigene Feldtypen mit Vorlagen (Teleporter, Kreuzung, Baustelle), Aussehen und Bilder (R2), Testmodus gegen Bots im Browser, Zufallsbrett-Generator.
+- Nächste Phase: Feinschliff (Phase 6), siehe docs/KONZEPT.md.
 
 ## Arbeitsweise
 

@@ -20,9 +20,11 @@ Alles, was ein Spiel ausmacht, steckt in einem **Board Pack** (JSON):
 | `rules`      | Startgeld, Los-Bonus, Auktionen, Frei-Parken-Topf, Gefängnisregeln, Baulimit, gleichmäßiges Bauen, Hypothekenzins, Siegbedingung, Bankrott-Regel |
 | `dice`       | Anzahl und Seitenzahl der Würfel                                                                                                                 |
 | `maxPlayers` | Höchstzahl an Spielern                                                                                                                           |
-| `layout`     | Form des Bretts (Phase 1: Quadrat, Rechteck)                                                                                                     |
+| `layout`     | Form des Bretts: Quadrat, Rechteck, Ring oder freier Pfad                                                                                        |
 | `groups`     | Farbgruppen, Bahnhofs- und Werksgruppen                                                                                                          |
 | `tiles`      | Felder; jedes Feld hat einen Feldtyp                                                                                                             |
+| `tileTypes`  | Eigene Feldtypen: Regeln aus Auslöser → Bedingungen → Aktionen                                                                                   |
+| `theme`      | Aussehen: Farben, Schrift, Figuren, Bild in der Brettmitte                                                                                       |
 | `decks`      | Kartenstapel mit Karten, deren Wirkung als feste Aktionen beschrieben ist                                                                        |
 
 Die Engine kennt **keine fest eingebauten Felder**, nur Feldtypen und Effekte. Klassische Felder (Grundstück, Bahnhof, Werk, Steuer, Karte, Gefängnis, Los, Frei Parken, Ab ins Gefängnis) sind eingebaute Feldtypen, die dasselbe Effektsystem nutzen wie spätere eigene Typen.
@@ -38,11 +40,9 @@ Eigene Feldtypen und Karten beschreiben ihre Logik **deklarativ** als Auslöser 
 5. **Anpassung II** – Brett-Editor, Effekt-Baukasten, Testmodus, Zufallsbrett-Generator.
 6. **Feinschliff** – erweiterter Handel (Mietfreiheit, Ratenzahlung, Gewinnbeteiligung), Bot Schwer, Animationen, Sound, Replay-Ansicht, Statistiken, Variablen, weitere Packs.
 
-Stand: Phase 1 bis 4 sind umgesetzt. Für die nächsten Phasen gibt es diese Anknüpfungspunkte:
+Stand: Phase 1 bis 5 sind umgesetzt. Für Phase 6 gibt es diese Anknüpfungspunkte:
 
-- **Bot Schwer (Phase 6):** `@menelgame/bots` hat eine Strategie-Schnittstelle; eine weitere Stufe kann Landewahrscheinlichkeiten per Engine simulieren.
-- **Testmodus gegen Bots (Phase 5):** Die Bots sind reine Funktionen und laufen auch im Browser.
-- **Brett-Editor (Phase 5):** Packs liegen in D1 und werden über `PUT /api/packs/<id>` gespeichert; der Inhalts-Editor validiert schon live mit dem Schema. Bilder kommen über den Worker nach R2.
-- **Eigene Feldtypen (Phase 5):** Feldtyp-Registry mit `onLand`/`onPass`, die nur deklarative Effekte liefert.
-- **Vereinbarungen mit Laufzeit (Phase 6):** `state.agreements` und `TradeOffer` sind dafür vorgesehen.
-- **Replay-Ansicht (Phase 6):** Startzustand + Aktionsliste ergibt exakt denselben Endzustand; der Server liefert das Log.
+- **Bot Schwer:** `@menelgame/bots` hat eine Strategie-Schnittstelle; eine weitere Stufe kann Landewahrscheinlichkeiten per Engine simulieren.
+- **Vereinbarungen mit Laufzeit:** `state.agreements` und `TradeOffer` sind dafür vorgesehen.
+- **Replay-Ansicht:** Startzustand + Aktionsliste ergibt exakt denselben Endzustand; der Server liefert das Log nach Spielende.
+- **Variablen für eigene Feldtypen:** Bedingungen und Effekte sind Zod-Unions und lassen sich um Zähler pro Spieler erweitern.
