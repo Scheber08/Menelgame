@@ -2,7 +2,7 @@
 
 Ein vollständig anpassbares Grundstücks-Handelsspiel für private Runden mit Freunden. Alles, was ein Spiel ausmacht – Brett, Felder, Karten, Regeln –, steckt in einem JSON-„Board Pack“.
 
-**Stand: Phase 1.** Die Engine ist fertig und lokal im Browser als Hot-Seat für 2–4 Spieler spielbar. Online-Multiplayer folgt in Phase 2.
+**Stand: Phase 2.** Online-Räume mit Einladungslink, Auktionen, Handel und Host-Rechten laufen auf einem Cloudflare Worker mit Durable Objects. Lokal geht es auch als Hot-Seat an einem Gerät.
 
 ## Schnellstart
 
@@ -13,7 +13,9 @@ pnpm install
 pnpm dev
 ```
 
-Dann <http://localhost:5173> öffnen, Spieler eintragen und „Spiel starten“.
+Dann <http://localhost:5173> öffnen. `pnpm dev` startet Web-Oberfläche und Worker (`wrangler dev`) zusammen.
+
+Online spielen: „Raum erstellen“, Link an Freunde schicken, als Host starten. Zum Ausprobieren auf einem Rechner ein zweites Browserprofil oder ein privates Fenster nutzen.
 
 ## Weitere Befehle
 
@@ -21,6 +23,7 @@ Dann <http://localhost:5173> öffnen, Spieler eintragen und „Spiel starten“.
 pnpm test    # alle Tests
 pnpm lint    # ESLint + Prettier-Check
 pnpm build   # Typprüfung + Produktions-Build (apps/web/dist)
+pnpm deploy  # zu Cloudflare hochladen (vorher einmal wrangler login, siehe AGENTS.md)
 ```
 
 ## Mehr

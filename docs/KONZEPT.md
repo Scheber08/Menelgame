@@ -38,10 +38,10 @@ Eigene Feldtypen und Karten beschreiben ihre Logik **deklarativ** als Auslöser 
 5. **Anpassung II** – Brett-Editor, Effekt-Baukasten, Testmodus, Zufallsbrett-Generator.
 6. **Feinschliff** – erweiterter Handel (Mietfreiheit, Ratenzahlung, Gewinnbeteiligung), Bot Schwer, Animationen, Sound, Replay-Ansicht, Statistiken, Variablen, weitere Packs.
 
-Phase 1 ist so gebaut, dass diese Erweiterungen ohne Umbau möglich sind:
+Stand: Phase 1 und 2 sind umgesetzt. Für die nächsten Phasen gibt es diese Anknüpfungspunkte:
 
-- **Auktionen:** Hook `startAuction` in der Engine, wird beim Ablehnen eines Kaufs und bei Bankrott mit Versteigerung aufgerufen.
-- **Handel und Vereinbarungen:** `agreements` im Spielzustand ist bereits vorhanden (Objekte mit Laufzeit).
-- **Live geänderte Regeln:** Der Spielzustand trägt eine eigene Kopie der Regeln (`state.rules`, `state.dice`), getrennt vom Pack.
-- **Bots:** Bots schicken dieselben Aktionen wie Menschen; `getLegalActions` liefert alle erlaubten Aktionen.
-- **Replay:** Startzustand + Aktionsliste ergibt exakt denselben Endzustand.
+- **Bots (Phase 3):** Bots schicken dieselben Aktionen wie Menschen; `getLegalActions(state, playerId)` liefert alle erlaubten Aktionen, `getDefaultAction` eine sichere Rückfallaktion. Im Durable Object läuft bereits ein Alarm für Uhren.
+- **Packs in D1 (Phase 4):** Der Spielraum speichert das Pack als Schnappschuss im Spielzustand.
+- **Eigene Feldtypen (Phase 5):** Feldtyp-Registry mit `onLand`/`onPass`, die nur deklarative Effekte liefert.
+- **Vereinbarungen mit Laufzeit (Phase 6):** `state.agreements` und `TradeOffer` sind dafür vorgesehen.
+- **Replay-Ansicht (Phase 6):** Startzustand + Aktionsliste ergibt exakt denselben Endzustand; der Server liefert das Log.
