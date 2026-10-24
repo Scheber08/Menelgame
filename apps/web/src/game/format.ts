@@ -1,4 +1,4 @@
-import type { GameEvent, GameState, Party } from '@menelgame/engine';
+import type { Agreement, AgreementTerm, GameEvent, GameState, Party } from '@menelgame/engine';
 import type { BoardPack, Condition, Effect, TileRule } from '@menelgame/schema';
 import type { TFunction } from 'i18next';
 
@@ -87,6 +87,12 @@ export function formatEvent(t: TFunction, state: GameState, event: GameEvent): s
           return t('events.bankruptcyTransfer', { from, to, amount });
         case 'trade':
           return t('events.tradeMoney', { from, to, amount });
+        case 'agreement':
+          return t('events.agreementMoney', { from, to, amount });
+        case 'variable':
+          return event.from === 'bank'
+            ? t('events.cardCollect', { from, to, amount })
+            : t('events.cardPay', { from, to, amount });
         default:
           return null;
       }
@@ -135,6 +141,26 @@ export function formatEvent(t: TFunction, state: GameState, event: GameEvent): s
       return t('events.tradeRejected', { player: name(event.by) });
     case 'tradeCancelled':
       return event.reason === 'countered' ? null : t(`events.tradeCancelled_${event.reason}`);
+    case 'agreementStarted':
+      return t('events.agreementStarted', {
+        text: describeTerm(t, state, event.agreement.term, event.agreement.parties),
+      });
+    case 'agreementEnded':
+      return t(`events.agreementEnded_${event.reason}`);
+    case 'rentShared':
+      return null;
+    case 'variableChanged': {
+      const variable =
+        state.pack.variables.find((v) => v.id === event.variable)?.name ?? event.variable;
+      return event.playerId
+        ? t('events.variableChangedPlayer', {
+            variable,
+            player: name(event.playerId),
+            from: event.from,
+            to: event.to,
+          })
+        : t('events.variableChanged', { variable, from: event.from, to: event.to });
+    }
     case 'rulesUpdated':
       return t('events.rulesUpdated', {
         changes: event.changes.map((c) => t(`ruleNames.${c}`, { defaultValue: c })).join(', '),
@@ -159,10 +185,14 @@ export function formatEvent(t: TFunction, state: GameState, event: GameEvent): s
       return t('events.turnSkipped', { player: name(event.playerId) });
     case 'rentDue':
       return null;
-    case 'noRent':
-      return t(event.why === 'mortgaged' ? 'events.noRentMortgaged' : 'events.noRentOwnerInJail', {
-        tile: tileName(state, event.tileId),
-      });
+    case 'noRent': {
+      const key = {
+        mortgaged: 'events.noRentMortgaged',
+        ownerInJail: 'events.noRentOwnerInJail',
+        agreement: 'events.noRentAgreement',
+      }[event.why];
+      return t(key, { tile: tileName(state, event.tileId) });
+    }
     case 'cardDrawn':
       return t('events.cardDrawn', {
         player: name(event.playerId),
@@ -297,7 +327,28 @@ export function describeEffect(t: TFunction, pack: BoardPack, effect: Effect): s
       return t('describe.skipTurns', { count: effect.turns });
     case 'choice':
       return t('describe.choice', { options: effect.options.map((o) => o.label).join(' / ') });
+    case 'setVariable':
+      return t(
+        effect.op === 'set'
+          ? 'describe.setVariable'
+          : effect.value < 0
+            ? 'describe.decreaseVariable'
+            : 'describe.increaseVariable',
+        { variable: variableName(pack, effect.variable), value: Math.abs(effect.value) },
+      );
+    case 'collectVariable':
+      return t(
+        effect.percent === 100 ? 'describe.collectVariable' : 'describe.collectVariablePercent',
+        {
+          variable: variableName(pack, effect.variable),
+          percent: effect.percent,
+        },
+      );
   }
+}
+
+export function variableName(pack: BoardPack, id: string): string {
+  return pack.variables.find((v) => v.id === id)?.name ?? id;
 }
 
 export function describeCondition(t: TFunction, pack: BoardPack, c: Condition): string {
@@ -316,6 +367,11 @@ export function describeCondition(t: TFunction, pack: BoardPack, c: Condition): 
       return t('describe.ownsGroup', {
         group: pack.groups.find((g) => g.id === c.group)?.name ?? c.group,
       });
+    case 'variable':
+      return t(`describe.variable_${c.op}`, {
+        variable: variableName(pack, c.variable),
+        value: c.value,
+      });
   }
 }
 
@@ -326,4 +382,24 @@ export function describeRule(t: TFunction, pack: BoardPack, rule: TileRule): str
   return conditions.length > 0
     ? t('describe.ruleIf', { when, conditions: conditions.join(t('describe.and')), effects })
     : t('describe.rule', { when, effects });
+}
+
+/** Text einer Vereinbarung, z. B. „Bea zahlt 3 Runden keine Miete auf Mühlweg (Anton)“. */
+export function describeTerm(
+  t: TFunction,
+  state: GameState,
+  term: AgreementTerm,
+  parties: Agreement['parties'],
+): string {
+  const giver = term.kind === 'installments' ? term.payer : term.owner;
+  const other = parties[0] === giver ? parties[1] : parties[0];
+  const tiles = 'tiles' in term ? term.tiles.map((id) => tileName(state, id)).join(', ') : '';
+  return t(`trade.term_${term.kind}`, {
+    count: term.rounds,
+    giver: playerName(state, giver),
+    other: playerName(state, other),
+    tiles,
+    amount: term.kind === 'installments' ? formatMoney(t, term.amount) : '',
+    percent: term.kind === 'profitShare' ? term.percent : 0,
+  });
 }

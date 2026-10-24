@@ -207,7 +207,11 @@ export function PackEditorPage({ id }: { id: string }) {
           {tab === 'cards' && <CardsEditor pack={draft} onChange={update} />}
 
           {tab === 'types' && (
-            <TileTypesTab pack={draft} onChange={(tileTypes) => update({ tileTypes })} />
+            <TileTypesTab
+              pack={draft}
+              onChange={(tileTypes) => update({ tileTypes })}
+              onVariablesChange={(variables) => update({ variables })}
+            />
           )}
 
           {tab === 'theme' && (

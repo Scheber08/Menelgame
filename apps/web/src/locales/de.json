@@ -58,7 +58,8 @@
     "seatKind": "Mensch oder Bot",
     "human": "Mensch",
     "botEasy": "Bot (leicht)",
-    "botMedium": "Bot (mittel)"
+    "botMedium": "Bot (mittel)",
+    "botHard": "Bot (schwer)"
   },
   "turn": {
     "heading": "Am Zug",
@@ -224,7 +225,14 @@
     "blockedTileLanded": "{{tile}} ist gesperrt – nichts passiert",
     "skipTurnsAdded_one": "{{player}} muss {{count}} Zug aussetzen",
     "skipTurnsAdded_other": "{{player}} muss {{count}} Züge aussetzen",
-    "turnSkipped": "{{player}} setzt aus"
+    "turnSkipped": "{{player}} setzt aus",
+    "agreementStarted": "Vereinbarung: {{text}}",
+    "agreementEnded_expired": "Eine Vereinbarung ist ausgelaufen.",
+    "agreementEnded_bankrupt": "Eine Vereinbarung endet wegen Bankrott.",
+    "agreementMoney": "{{from}} zahlt {{to}} {{amount}} aus einer Vereinbarung.",
+    "noRentAgreement": "Keine Miete auf {{tile}}: Mietfreiheit vereinbart.",
+    "variableChanged": "{{variable}}: {{from}} → {{to}}",
+    "variableChangedPlayer": "{{variable}} von {{player}}: {{from}} → {{to}}"
   },
   "gameOver": {
     "heading": "{{winner}} gewinnt!",
@@ -339,7 +347,28 @@
     "jailCards": "Gefängnis-frei-Karten",
     "send": "Angebot senden",
     "sendCounter": "Gegenangebot senden",
-    "discard": "Verwerfen"
+    "discard": "Verwerfen",
+    "agreement": "Vereinbarung",
+    "terms": "Vereinbarungen mit Laufzeit",
+    "termsHint": "Optional: Mietfreiheit, Ratenzahlung oder Gewinnbeteiligung für einige Runden.",
+    "kind_rentFree": "Mietfreiheit",
+    "kind_installments": "Ratenzahlung",
+    "kind_profitShare": "Gewinnbeteiligung",
+    "grantor": "Gewährt von",
+    "payer": "Zahlt",
+    "amountPerRound": "Betrag pro Runde",
+    "percent": "Anteil (%)",
+    "rounds": "Runden",
+    "removeTerm": "Vereinbarung entfernen",
+    "running": "Laufende Vereinbarungen",
+    "remaining_one": "noch {{count}} Runde",
+    "remaining_other": "noch {{count}} Runden",
+    "term_rentFree_one": "{{other}} zahlt {{count}} Runde keine Miete auf {{tiles}} von {{giver}}",
+    "term_rentFree_other": "{{other}} zahlt {{count}} Runden keine Miete auf {{tiles}} von {{giver}}",
+    "term_installments_one": "{{giver}} zahlt {{other}} {{count}} Runde lang je {{amount}}",
+    "term_installments_other": "{{giver}} zahlt {{other}} {{count}} Runden lang je {{amount}}",
+    "term_profitShare_one": "{{other}} bekommt {{count}} Runde lang {{percent}} % der Miete auf {{tiles}} von {{giver}}",
+    "term_profitShare_other": "{{other}} bekommt {{count}} Runden lang {{percent}} % der Miete auf {{tiles}} von {{giver}}"
   },
   "home": {
     "heading": "Willkommen bei Menelgame",
@@ -389,7 +418,8 @@
     "botBadge": "Bot · {{level}}",
     "standIn": "Bot vertritt",
     "takeover": "Bot übernimmt abwesende Spieler nach",
-    "never": "nie"
+    "never": "nie",
+    "bot_hard": "schwer"
   },
   "roomErrors": {
     "badMessage": "Ungültige Nachricht.",
@@ -595,7 +625,19 @@
     "turns": "Züge",
     "optionLabel": "Möglichkeit {{n}}",
     "removeOption": "Möglichkeit entfernen",
-    "addOption": "+ Möglichkeit"
+    "addOption": "+ Möglichkeit",
+    "variable": "Variable",
+    "op_add": "ändern um",
+    "op_set": "setzen auf",
+    "variablesHeading": "Variablen",
+    "variablesIntro": "Zähler pro Spieler (z. B. gesammelte Sterne) oder für das ganze Spiel (z. B. ein Jackpot). Feldtypen und Karten können sie ändern, abfragen und auszahlen.",
+    "newVariable": "Zähler {{n}}",
+    "addVariable": "+ Variable",
+    "scope": "Gilt für",
+    "scope_player": "jeden Spieler",
+    "scope_game": "das ganze Spiel",
+    "initial": "Startwert",
+    "variableInUse": "Wird noch von einer Regel oder Karte benutzt"
   },
   "effects": {
     "collect": "Geld von der Bank",
@@ -613,7 +655,9 @@
     "drawCard": "Karte ziehen",
     "blockTile": "Feld sperren",
     "skipTurns": "Aussetzen",
-    "choice": "Auswahl anbieten"
+    "choice": "Auswahl anbieten",
+    "setVariable": "Variable ändern",
+    "collectVariable": "Variable auszahlen"
   },
   "ruleSets": {
     "namePrompt": "Name für das Regelset:",
@@ -678,7 +722,15 @@
     "ownsGroup": "wer „{{group}}“ ganz besitzt",
     "rule": "{{when}}: {{effects}}",
     "ruleIf": "{{when}}, wenn {{conditions}}: {{effects}}",
-    "and": " und "
+    "and": " und ",
+    "setVariable": "setze „{{variable}}“ auf {{value}}",
+    "increaseVariable": "erhöhe „{{variable}}“ um {{value}}",
+    "decreaseVariable": "verringere „{{variable}}“ um {{value}}",
+    "collectVariable": "erhalte „{{variable}}“ in Talern",
+    "collectVariablePercent": "erhalte {{percent}} % von „{{variable}}“ in Talern",
+    "variable_eq": "„{{variable}}“ genau {{value}}",
+    "variable_lt": "„{{variable}}“ unter {{value}}",
+    "variable_gte": "„{{variable}}“ ab {{value}}"
   },
   "triggers": {
     "land": "Beim Betreten",
@@ -703,6 +755,7 @@
     "double": "Pasch",
     "buildings": "Gebäude",
     "chance": "Zufall",
-    "ownsGroup": "Besitzt Gruppe"
+    "ownsGroup": "Besitzt Gruppe",
+    "variable": "Variable"
   }
 }

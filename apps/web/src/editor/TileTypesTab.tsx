@@ -5,6 +5,7 @@ import {
   type CustomTileType,
   type TileRule,
   type Trigger,
+  type Variable,
 } from '@menelgame/schema';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +21,7 @@ const CONDITION_KINDS: Condition['kind'][] = [
   'buildings',
   'chance',
   'ownsGroup',
+  'variable',
 ];
 
 function defaultCondition(kind: Condition['kind'], pack: BoardPack): Condition {
@@ -36,6 +38,8 @@ function defaultCondition(kind: Condition['kind'], pack: BoardPack): Condition {
       return { kind, percent: 50 };
     case 'ownsGroup':
       return { kind, group: pack.groups[0]?.id ?? '' };
+    case 'variable':
+      return { kind, variable: pack.variables[0]?.id ?? '', op: 'gte', value: 1 };
   }
 }
 
@@ -92,9 +96,11 @@ function presets(t: (key: string) => string): CustomTileType[] {
 export function TileTypesTab({
   pack,
   onChange,
+  onVariablesChange,
 }: {
   pack: BoardPack;
   onChange: (types: CustomTileType[]) => void;
+  onVariablesChange: (variables: Variable[]) => void;
 }) {
   const { t } = useTranslation();
   const types = pack.tileTypes;
@@ -123,6 +129,7 @@ export function TileTypesTab({
 
   return (
     <div className="types-tab">
+      <VariablesSection pack={pack} onChange={onVariablesChange} />
       <p className="muted small">{t('editor.typesIntro')}</p>
       <div className="action-buttons">
         <button type="button" onClick={() => add()}>
@@ -345,11 +352,13 @@ function ConditionList({
             aria-label={t('editor.condition')}
             onChange={(e) => set(i, defaultCondition(e.target.value as Condition['kind'], pack))}
           >
-            {CONDITION_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {t(`conditions.${k}`)}
-              </option>
-            ))}
+            {CONDITION_KINDS.filter((k) => k !== 'variable' || pack.variables.length > 0).map(
+              (k) => (
+                <option key={k} value={k}>
+                  {t(`conditions.${k}`)}
+                </option>
+              ),
+            )}
           </select>
           {c.kind === 'cash' && (
             <>
@@ -409,6 +418,29 @@ function ConditionList({
               ))}
             </select>
           )}
+          {c.kind === 'variable' && (
+            <>
+              <select
+                value={c.variable}
+                aria-label={t('editor.variable')}
+                onChange={(e) => set(i, { ...c, variable: e.target.value })}
+              >
+                {pack.variables.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+              {op(c.op, ['eq', 'lt', 'gte'], (v) => set(i, { ...c, op: v as 'eq' | 'lt' | 'gte' }))}
+              <NumberField
+                label={t('editor.value')}
+                value={c.value}
+                min={-1_000_000}
+                max={1_000_000}
+                onChange={(n) => set(i, { ...c, value: n })}
+              />
+            </>
+          )}
           <button
             type="button"
             className="link danger-link"
@@ -428,5 +460,77 @@ function ConditionList({
         </button>
       )}
     </div>
+  );
+}
+
+/** Zähler pro Spieler oder fürs ganze Spiel, die Feldtypen und Karten nutzen können. */
+function VariablesSection({
+  pack,
+  onChange,
+}: {
+  pack: BoardPack;
+  onChange: (variables: Variable[]) => void;
+}) {
+  const { t } = useTranslation();
+  const variables = pack.variables;
+  const set = (i: number, patch: Partial<Variable>) =>
+    onChange(variables.map((v, j) => (j === i ? { ...v, ...patch } : v)));
+  const used = (id: string) =>
+    JSON.stringify([pack.tileTypes, pack.decks]).includes(`"variable":"${id}"`);
+  const add = () => {
+    const ids = new Set(variables.map((v) => v.id));
+    let n = variables.length + 1;
+    while (ids.has(`var${n}`)) n++;
+    onChange([
+      ...variables,
+      { id: `var${n}`, name: t('editor.newVariable', { n }), scope: 'player', initial: 0 },
+    ]);
+  };
+
+  return (
+    <section className="panel variables">
+      <h3>{t('editor.variablesHeading')}</h3>
+      <p className="muted small">{t('editor.variablesIntro')}</p>
+      {variables.map((v, i) => (
+        <div key={i} className="effect">
+          <input
+            aria-label={t('editor.name')}
+            value={v.name}
+            maxLength={40}
+            onChange={(e) => set(i, { name: e.target.value })}
+          />
+          <code className="muted small">{v.id}</code>
+          <select
+            aria-label={t('editor.scope')}
+            value={v.scope}
+            onChange={(e) => set(i, { scope: e.target.value as Variable['scope'] })}
+          >
+            <option value="player">{t('editor.scope_player')}</option>
+            <option value="game">{t('editor.scope_game')}</option>
+          </select>
+          <NumberField
+            label={t('editor.initial')}
+            value={v.initial}
+            min={-1_000_000}
+            max={1_000_000}
+            onChange={(initial) => set(i, { initial })}
+          />
+          <button
+            type="button"
+            className="link danger-link"
+            disabled={used(v.id)}
+            title={used(v.id) ? t('editor.variableInUse') : undefined}
+            onClick={() => onChange(variables.filter((_, j) => j !== i))}
+          >
+            {t('editor.remove')}
+          </button>
+        </div>
+      ))}
+      {variables.length < 10 && (
+        <button type="button" className="link" onClick={add}>
+          {t('editor.addVariable')}
+        </button>
+      )}
+    </section>
   );
 }

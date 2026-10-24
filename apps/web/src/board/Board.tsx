@@ -444,6 +444,13 @@ function BoardCenter({
               hotels: supply(state.bank.hotels),
             })}
           </span>
+          {state.pack.variables
+            .filter((v) => v.scope === 'game')
+            .map((v) => (
+              <span key={v.id}>
+                {v.name}: {state.variables.game[v.id] ?? v.initial}
+              </span>
+            ))}
         </div>
       </div>
     </foreignObject>

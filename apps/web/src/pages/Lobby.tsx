@@ -117,7 +117,7 @@ export function Lobby({ online, room }: { online: OnlineRoom; room: RoomView }) 
         </ul>
         {isHost && room.seats.length < maxPlayers && (
           <div className="action-buttons add-bots">
-            {(['easy', 'medium'] as const).map((level) => (
+            {(['easy', 'medium', 'hard'] as const).map((level) => (
               <button key={level} type="button" onClick={() => send({ t: 'addBot', level })}>
                 {t('room.addBot', { level: t(`room.bot_${level}`) })}
               </button>
@@ -303,7 +303,7 @@ function LobbyCardsPanel({
               />
               <EffectEditor
                 effects={card.effects as Effect[]}
-                context={{ tiles, decks: [], tileTypes: [] }}
+                context={{ tiles, decks: [], tileTypes: [], variables: [] }}
                 kinds={LOBBY_EFFECT_KINDS}
                 maxAmount={rules.maxAmount}
                 maxEffects={3}

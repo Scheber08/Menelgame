@@ -1,8 +1,12 @@
 import {
   activePlayers,
   groupTiles,
+  MAX_AGREEMENT_ROUNDS,
+  MAX_INSTALLMENT,
+  MAX_TERMS_PER_TRADE,
   ownedTiles,
   type Action,
+  type AgreementTerm,
   type GameState,
   type TradeBundle,
   type TradeOffer,
@@ -10,7 +14,8 @@ import {
 import type { TFunction } from 'i18next';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatMoney, playerName, tileName } from '../game/format';
+import { describeTerm, formatMoney, playerName, tileName } from '../game/format';
+import { NumberField } from './fields';
 
 interface TradePanelProps {
   state: GameState;
@@ -26,6 +31,7 @@ interface Draft {
   to: string;
   give: TradeBundle;
   receive: TradeBundle;
+  terms: AgreementTerm[];
   /** Gegenangebot zu diesem Angebot. */
   counterTo: string | null;
 }
@@ -54,12 +60,13 @@ export function TradePanel({ state, controls, dispatch }: TradePanelProps) {
   const tradingOpen = !['auction', 'gameOver'].includes(state.phase.name);
   const active = activePlayers(state);
   const proposers = active.filter((p) => controls.includes(p.id));
-  if (proposers.length === 0 && state.trades.length === 0) return null;
+  if (proposers.length === 0 && state.trades.length === 0 && state.agreements.length === 0)
+    return null;
 
   const startDraft = () => {
     const from = proposers[0]!.id;
     const to = active.find((p) => p.id !== from)?.id ?? '';
-    setDraft({ from, to, give: EMPTY, receive: EMPTY, counterTo: null });
+    setDraft({ from, to, give: EMPTY, receive: EMPTY, terms: [], counterTo: null });
   };
 
   const counter = (offer: TradeOffer) =>
@@ -68,6 +75,7 @@ export function TradePanel({ state, controls, dispatch }: TradePanelProps) {
       to: offer.from,
       give: offer.receive,
       receive: offer.give,
+      terms: offer.terms,
       counterTo: offer.id,
     });
 
@@ -106,6 +114,12 @@ export function TradePanel({ state, controls, dispatch }: TradePanelProps) {
                 </span>{' '}
                 {describe(t, state, offer.receive)}
               </div>
+              {offer.terms.map((term, i) => (
+                <div key={i} className="term">
+                  <span className="badge">{t('trade.agreement')}</span>{' '}
+                  {describeTerm(t, state, term, [offer.from, offer.to])}
+                </div>
+              ))}
             </div>
             {tradingOpen && (
               <div className="action-buttons">
@@ -151,6 +165,22 @@ export function TradePanel({ state, controls, dispatch }: TradePanelProps) {
         ))}
       </ul>
 
+      {state.agreements.length > 0 && (
+        <div className="agreements">
+          <h3>{t('trade.running')}</h3>
+          <ul>
+            {state.agreements.map((a) => (
+              <li key={a.id}>
+                {describeTerm(t, state, a.term, a.parties)}{' '}
+                <span className="muted small">
+                  {t('trade.remaining', { count: a.remainingRounds })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {draft && tradingOpen && (
         <TradeForm
           state={state}
@@ -167,6 +197,7 @@ export function TradePanel({ state, controls, dispatch }: TradePanelProps) {
                     tradeId: d.counterTo,
                     give: d.give,
                     receive: d.receive,
+                    terms: d.terms,
                   }
                 : {
                     type: 'PROPOSE_TRADE',
@@ -174,6 +205,7 @@ export function TradePanel({ state, controls, dispatch }: TradePanelProps) {
                     to: d.to,
                     give: d.give,
                     receive: d.receive,
+                    terms: d.terms,
                   },
             );
             setDraft(null);
@@ -217,6 +249,7 @@ function TradeForm({ state, draft, proposers, onChange, onCancel, onSubmit }: Tr
                 from: e.target.value,
                 to: draft.to === e.target.value ? '' : draft.to,
                 give: EMPTY,
+                terms: [],
               })
             }
           >
@@ -232,7 +265,7 @@ function TradeForm({ state, draft, proposers, onChange, onCancel, onSubmit }: Tr
           <select
             value={draft.to}
             disabled={fixed}
-            onChange={(e) => onChange({ ...draft, to: e.target.value, receive: EMPTY })}
+            onChange={(e) => onChange({ ...draft, to: e.target.value, receive: EMPTY, terms: [] })}
           >
             <option value="" disabled>
               –
@@ -263,6 +296,13 @@ function TradeForm({ state, draft, proposers, onChange, onCancel, onSubmit }: Tr
           />
         )}
       </div>
+      {draft.to && (
+        <TermsEditor
+          state={state}
+          draft={draft}
+          onChange={(terms) => onChange({ ...draft, terms })}
+        />
+      )}
       <div className="action-buttons">
         <button type="submit" className="primary" disabled={!draft.to}>
           {fixed ? t('trade.sendCounter') : t('trade.send')}
@@ -347,6 +387,148 @@ function BundleEditor({
             }
           />
         </label>
+      )}
+    </fieldset>
+  );
+}
+
+/** Felder, die `owner` nach dem Tausch besitzt – nur darauf kann er etwas gewähren. */
+function tilesAfterTrade(state: GameState, draft: Draft, owner: string) {
+  const [gives, gets] =
+    owner === draft.from ? [draft.give, draft.receive] : [draft.receive, draft.give];
+  const ids = new Set(ownedTiles(state, owner).map((x) => x.id));
+  for (const id of gives.tiles) ids.delete(id);
+  for (const id of gets.tiles) ids.add(id);
+  return state.pack.tiles.filter((x) => ids.has(x.id));
+}
+
+function newTerm(kind: AgreementTerm['kind'], grantor: string): AgreementTerm {
+  switch (kind) {
+    case 'rentFree':
+      return { kind, owner: grantor, tiles: [], rounds: 3 };
+    case 'installments':
+      return { kind, payer: grantor, amount: 50, rounds: 5 };
+    case 'profitShare':
+      return { kind, owner: grantor, tiles: [], percent: 25, rounds: 5 };
+  }
+}
+
+/** Vereinbarungen mit Laufzeit: Mietfreiheit, Ratenzahlung, Gewinnbeteiligung. */
+function TermsEditor({
+  state,
+  draft,
+  onChange,
+}: {
+  state: GameState;
+  draft: Draft;
+  onChange: (terms: AgreementTerm[]) => void;
+}) {
+  const { t } = useTranslation();
+  const terms = draft.terms;
+  const set = (i: number, term: AgreementTerm) =>
+    onChange(terms.map((x, j) => (j === i ? term : x)));
+  const grantorOf = (term: AgreementTerm) =>
+    term.kind === 'installments' ? term.payer : term.owner;
+  const withGrantor = (term: AgreementTerm, grantor: string): AgreementTerm =>
+    term.kind === 'installments'
+      ? { ...term, payer: grantor }
+      : { ...term, owner: grantor, tiles: [] };
+
+  return (
+    <fieldset className="terms">
+      <legend>{t('trade.terms')}</legend>
+      {terms.length === 0 && <p className="muted small">{t('trade.termsHint')}</p>}
+      {terms.map((term, i) => {
+        const grantor = grantorOf(term);
+        const tiles = term.kind === 'installments' ? [] : tilesAfterTrade(state, draft, grantor);
+        return (
+          <div key={i} className="term-editor">
+            <strong>{t(`trade.kind_${term.kind}`)}</strong>
+            <label className="field">
+              {t(term.kind === 'installments' ? 'trade.payer' : 'trade.grantor')}
+              <select value={grantor} onChange={(e) => set(i, withGrantor(term, e.target.value))}>
+                {[draft.from, draft.to].map((id) => (
+                  <option key={id} value={id}>
+                    {playerName(state, id)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {term.kind !== 'installments' && (
+              <div className="bundle-tiles">
+                {tiles.length === 0 && <span className="muted small">{t('trade.noTiles')}</span>}
+                {tiles.map((tile) => (
+                  <label key={tile.id} className="check">
+                    <input
+                      type="checkbox"
+                      checked={term.tiles.includes(tile.id)}
+                      onChange={() =>
+                        set(i, {
+                          ...term,
+                          tiles: term.tiles.includes(tile.id)
+                            ? term.tiles.filter((x) => x !== tile.id)
+                            : [...term.tiles, tile.id].slice(0, 12),
+                        })
+                      }
+                    />
+                    {tile.name}
+                  </label>
+                ))}
+              </div>
+            )}
+            {term.kind === 'installments' && (
+              <NumberField
+                label={t('trade.amountPerRound')}
+                value={term.amount}
+                min={10}
+                max={MAX_INSTALLMENT}
+                step={10}
+                onChange={(amount) => set(i, { ...term, amount })}
+              />
+            )}
+            {term.kind === 'profitShare' && (
+              <NumberField
+                label={t('trade.percent')}
+                value={term.percent}
+                min={5}
+                max={100}
+                step={5}
+                onChange={(percent) => set(i, { ...term, percent })}
+              />
+            )}
+            <NumberField
+              label={t('trade.rounds')}
+              value={term.rounds}
+              min={1}
+              max={MAX_AGREEMENT_ROUNDS}
+              onChange={(rounds) => set(i, { ...term, rounds })}
+            />
+            <p className="muted small">{describeTerm(t, state, term, [draft.from, draft.to])}</p>
+            <button
+              type="button"
+              className="link danger-link"
+              onClick={() => onChange(terms.filter((_, j) => j !== i))}
+            >
+              {t('trade.removeTerm')}
+            </button>
+          </div>
+        );
+      })}
+      {terms.length < MAX_TERMS_PER_TRADE && (
+        <div className="action-buttons">
+          {(['rentFree', 'installments', 'profitShare'] as const).map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className="link"
+              onClick={() =>
+                onChange([...terms, newTerm(kind, kind === 'installments' ? draft.from : draft.to)])
+              }
+            >
+              + {t(`trade.kind_${kind}`)}
+            </button>
+          ))}
+        </div>
       )}
     </fieldset>
   );

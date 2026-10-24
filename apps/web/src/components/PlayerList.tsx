@@ -60,6 +60,12 @@ export function PlayerList({
                   {t('players.netWorth')}: {formatMoney(t, netWorth(state, p.id))}
                   {p.jailFreeCards.length > 0 &&
                     ` · ${t('players.jailFreeCards', { count: p.jailFreeCards.length })}`}
+                  {state.pack.variables
+                    .filter((v) => v.scope === 'player')
+                    .map(
+                      (v) => ` · ${v.name}: ${state.variables.players[p.id]?.[v.id] ?? v.initial}`,
+                    )
+                    .join('')}
                 </div>
               )}
               {tiles.length > 0 && (

@@ -18,7 +18,11 @@ export const BASE_EFFECT_KINDS: EffectKind[] = [
   'drawCard',
   'blockTile',
   'skipTurns',
+  'setVariable',
+  'collectVariable',
 ];
+
+const VARIABLE_KINDS: EffectKind[] = ['setVariable', 'collectVariable'];
 
 export const ALL_EFFECT_KINDS: EffectKind[] = [...BASE_EFFECT_KINDS, 'choice'];
 
@@ -32,6 +36,7 @@ export interface EffectContext {
   tiles: Named[];
   decks: Named[];
   tileTypes: Named[];
+  variables: Named[];
 }
 
 export function defaultEffect(kind: EffectKind, context: EffectContext): Effect {
@@ -64,6 +69,10 @@ export function defaultEffect(kind: EffectKind, context: EffectContext): Effect 
       return { kind, rounds: 2 };
     case 'skipTurns':
       return { kind, turns: 1 };
+    case 'setVariable':
+      return { kind, variable: context.variables[0]?.id ?? '', op: 'add', value: 1 };
+    case 'collectVariable':
+      return { kind, variable: context.variables[0]?.id ?? '', percent: 100 };
     case 'goToJail':
     case 'jailFreeCard':
       return { kind };
@@ -98,6 +107,9 @@ export function EffectEditor({
   maxEffects = 10,
 }: EffectEditorProps) {
   const { t } = useTranslation();
+  // Variablen-Aktionen nur anbieten, wenn das Pack Variablen hat.
+  const offered =
+    context.variables.length > 0 ? kinds : kinds.filter((k) => !VARIABLE_KINDS.includes(k));
   const set = (i: number, effect: Effect) =>
     onChange(effects.map((e, j) => (j === i ? effect : e)));
   const amount = (label: string, value: number, update: (n: number) => void) => (
@@ -141,7 +153,7 @@ export function EffectEditor({
             value={effect.kind}
             onChange={(e) => set(i, defaultEffect(e.target.value as EffectKind, context))}
           >
-            {kinds.map((k) => (
+            {(offered.includes(effect.kind) ? offered : [...offered, effect.kind]).map((k) => (
               <option key={k} value={k}>
                 {t(`effects.${k}`)}
               </option>
@@ -243,6 +255,44 @@ export function EffectEditor({
               onChange={(n) => set(i, { ...effect, turns: n })}
             />
           )}
+          {effect.kind === 'setVariable' && (
+            <>
+              {select(t('editor.variable'), effect.variable, context.variables, (variable) =>
+                set(i, { ...effect, variable }),
+              )}
+              <label className="field">
+                {t('editor.operator')}
+                <select
+                  value={effect.op}
+                  onChange={(e) => set(i, { ...effect, op: e.target.value as 'set' | 'add' })}
+                >
+                  <option value="add">{t('editor.op_add')}</option>
+                  <option value="set">{t('editor.op_set')}</option>
+                </select>
+              </label>
+              <NumberField
+                label={t('editor.value')}
+                value={effect.value}
+                min={-1_000_000}
+                max={1_000_000}
+                onChange={(n) => set(i, { ...effect, value: n })}
+              />
+            </>
+          )}
+          {effect.kind === 'collectVariable' && (
+            <>
+              {select(t('editor.variable'), effect.variable, context.variables, (variable) =>
+                set(i, { ...effect, variable }),
+              )}
+              <NumberField
+                label={t('editor.percent')}
+                value={effect.percent}
+                min={1}
+                max={1000}
+                onChange={(n) => set(i, { ...effect, percent: n })}
+              />
+            </>
+          )}
           {effect.kind === 'choice' && (
             <div className="choice-options">
               {effect.options.map((option, o) => {
@@ -317,7 +367,7 @@ export function EffectEditor({
         <button
           type="button"
           className="link"
-          onClick={() => onChange([...effects, defaultEffect(kinds[0]!, context)])}
+          onClick={() => onChange([...effects, defaultEffect(offered[0]!, context)])}
         >
           {t('editor.addEffect')}
         </button>
@@ -331,10 +381,12 @@ export function effectContext(pack: {
   tiles: Named[];
   decks: Named[];
   tileTypes?: Named[];
+  variables?: Named[];
 }): EffectContext {
   return {
     tiles: pack.tiles.map((t) => ({ id: t.id, name: t.name })),
     decks: pack.decks.map((d) => ({ id: d.id, name: d.name })),
     tileTypes: (pack.tileTypes ?? []).map((x) => ({ id: x.id, name: x.name })),
+    variables: (pack.variables ?? []).map((v) => ({ id: v.id, name: v.name })),
   };
 }

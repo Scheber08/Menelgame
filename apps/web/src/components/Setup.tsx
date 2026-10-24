@@ -115,6 +115,7 @@ export function Setup({ onStart }: { onStart: (setup: GameSetup, bots: BotSeats)
               <option value="">{t('setup.human')}</option>
               <option value="easy">{t('setup.botEasy')}</option>
               <option value="medium">{t('setup.botMedium')}</option>
+              <option value="hard">{t('setup.botHard')}</option>
             </select>
             <ColorPicker
               value={seat.color}
