@@ -1,10 +1,11 @@
 {
   "app": {
     "title": "Menelgame",
-    "tagline": "Grundstücke, Würfel und Freunde",
+    "tagline": "Würfeln, kaufen, bauen – mit Freunden",
     "newGame": "Neues Spiel",
     "confirmNewGame": "Das laufende Spiel beenden und ein neues starten?",
-    "hotSeat": "Hot-Seat"
+    "hotSeat": "Hot-Seat",
+    "footer": "Menelgame · ein Spiel für gemütliche Runden mit Freunden"
   },
   "money": "{{amount}} Taler",
   "setup": {
@@ -371,22 +372,34 @@
     "term_profitShare_other": "{{other}} bekommt {{count}} Runden lang {{percent}} % der Miete auf {{tiles}} von {{giver}}"
   },
   "home": {
-    "heading": "Willkommen bei Menelgame",
-    "intro": "Grundstücke kaufen, bauen, handeln – mit Freunden online oder an einem Gerät.",
-    "onlineHeading": "Online-Raum erstellen",
-    "onlineText": "Du bekommst einen Raumcode und einen Einladungslink für deine Freunde. Kein Account nötig.",
+    "heading": "Würfeln, kaufen, bauen – und gemeinsam lachen.",
+    "intro": "Schnapp dir deine Freunde, wähl ein Brett und los geht’s. Kein Account, keine Installation – ein Link genügt.",
+    "onlineHeading": "Mit Freunden spielen",
+    "onlineText": "Du bekommst einen Raum und einen Link zum Teilen.",
     "yourName": "Dein Name",
     "create": "Raum erstellen",
-    "joinHeading": "Raum beitreten",
-    "joinText": "Gib den sechsstelligen Code ein, den du bekommen hast.",
+    "joinHeading": "Einladung bekommen?",
+    "joinText": "Gib den sechsstelligen Raumcode ein.",
     "code": "Raumcode",
-    "join": "Beitreten",
-    "localHeading": "Lokal spielen",
-    "localText": "Hot-Seat: 2–4 Spieler wechseln sich an einem Gerät ab.",
-    "local": "Lokales Spiel",
+    "join": "Mitspielen",
+    "localHeading": "Gemeinsam am Sofa",
+    "localText": "Mehrere Spieler an einem Gerät – oder allein gegen Bots.",
+    "local": "Lokal spielen",
     "nameRequired": "Bitte gib einen Namen ein.",
     "createFailed": "Der Raum konnte nicht erstellt werden. Läuft der Server?",
-    "badCode": "Der Code hat sechs Zeichen (Buchstaben und Ziffern)."
+    "badCode": "Der Code hat sechs Zeichen (Buchstaben und Ziffern).",
+    "kicker": "Das Brettspiel für deine Runde",
+    "pointFriends": "Online mit Einladungslink",
+    "pointBots": "Bots füllen freie Plätze",
+    "pointPacks": "Eigene Bretter bauen",
+    "namePlaceholder": "Wie heißt du?",
+    "howHeading": "So einfach geht’s",
+    "step1Title": "Raum erstellen",
+    "step1Text": "Name eingeben, Farbe wählen, fertig.",
+    "step2Title": "Link teilen",
+    "step2Text": "Freunde öffnen den Link und setzen sich an den Tisch. Leere Plätze übernehmen Bots.",
+    "step3Title": "Würfeln!",
+    "step3Text": "Kaufen, bauen, handeln – wer am Ende am meisten besitzt, gewinnt."
   },
   "room": {
     "loading": "Raum wird gesucht …",

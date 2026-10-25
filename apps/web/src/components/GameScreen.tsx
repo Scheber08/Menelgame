@@ -110,7 +110,7 @@ export function GameScreen(props: GameScreenProps) {
       </div>
       <aside className="sidebar">
         <div className="settings-row">
-          <label className="check small">
+          <label className="toggle">
             <input
               type="checkbox"
               checked={settings.sound}
@@ -118,7 +118,7 @@ export function GameScreen(props: GameScreenProps) {
             />
             {t('settings.sound')}
           </label>
-          <label className="check small">
+          <label className="toggle">
             <input
               type="checkbox"
               checked={settings.animations}

@@ -9,6 +9,7 @@ import { isOwnable, mortgageValueOf, type Tile } from '@menelgame/schema';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { buildingsLabel, describeRule, formatMoney, playerName } from '../game/format';
+import { Icon } from './Icon';
 
 interface TileInfoProps {
   state: GameState;
@@ -23,7 +24,10 @@ export function TileInfo({ state, tileId, legal, dispatch }: TileInfoProps) {
   if (!tile) {
     return (
       <section className="panel">
-        <h2>{t('tile.heading')}</h2>
+        <h2>
+          <Icon name="info" />
+          {t('tile.heading')}
+        </h2>
         <p className="muted">{t('tile.none')}</p>
       </section>
     );

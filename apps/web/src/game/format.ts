@@ -30,12 +30,6 @@ export function deckName(state: GameState, deckId: string): string {
   return state.pack.decks.find((d) => d.id === deckId)?.name ?? deckId;
 }
 
-const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-
-export function diceFace(value: number, sides: number): string {
-  return sides === 6 ? (DICE_FACES[value - 1] ?? String(value)) : String(value);
-}
-
 /**
  * Lesbarer Text für ein Ereignis. Liefert null für Ereignisse, die schon durch ein anderes
  * abgedeckt sind (z. B. die Geldbuchung zu einem Kauf).

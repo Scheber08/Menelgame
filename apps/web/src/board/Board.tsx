@@ -2,12 +2,16 @@ import { HOTEL, type GameEvent, type GameState, type Player } from '@menelgame/e
 import { isOwnable, type Theme, type Tile } from '@menelgame/schema';
 import { useMemo, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { diceFace, formatMoney } from '../game/format';
+import { Die } from '../components/Die';
+import { formatMoney } from '../game/format';
 import { boardGeometry, type Side, type TileRect } from './geometry';
 
 const STRIPE = 20;
 const OWNER_BAND = 5;
-const TOKEN_R = 9;
+const TOKEN_R = 11;
+/** Abstand zwischen den Feldern und Innenabstand der Streifen. */
+const GAP = 1.5;
+const INSET = 3.5;
 const LABEL_FONT = 10;
 
 /** Schriftgröße, bei der das längste Wort ohne Trennung in die Breite passt. */
@@ -98,7 +102,7 @@ export function Board({ state, events, selectedTileId, onSelectTile, positions }
         y={0}
         width={geometry.width}
         height={geometry.height}
-        rx={6}
+        rx={22}
       />
       <BoardCenter state={state} events={events} rect={geometry.center} current={current} />
       {geometry.tiles.map((rect) => {
@@ -160,9 +164,15 @@ function tileParts(rect: TileRect, hasStripe: boolean) {
     right: { x: x + STRIPE, y, w: w - STRIPE - OWNER_BAND, h },
     none: { x, y: y + STRIPE * 0.8, w, h: h - STRIPE * 0.8 - OWNER_BAND },
   };
+  const inset = (b: Box): Box => ({
+    x: b.x + INSET,
+    y: b.y + INSET,
+    w: Math.max(0, b.w - 2 * INSET),
+    h: Math.max(0, b.h - 2 * INSET),
+  });
   return {
-    stripe: stripe[side],
-    band: band[side],
+    stripe: inset(stripe[side]),
+    band: inset(band[side]),
     content: hasStripe ? content[side] : { x, y, w, h },
   };
 }
@@ -226,19 +236,37 @@ function TileView({
     >
       <rect
         className="tile-bg"
-        x={x}
-        y={y}
-        width={w}
-        height={h}
-        rx={rect.side === 'none' ? 8 : 0}
+        x={x + GAP}
+        y={y + GAP}
+        width={w - 2 * GAP}
+        height={h - 2 * GAP}
+        rx={8}
       />
       {hasStripe && (
-        <rect x={stripe.x} y={stripe.y} width={stripe.w} height={stripe.h} fill={color} />
+        <rect
+          className="tile-stripe"
+          x={stripe.x}
+          y={stripe.y}
+          width={stripe.w}
+          height={stripe.h}
+          rx={5}
+          fill={color}
+        />
       )}
       {hasStripe && ts && ts.buildings > 0 && (
         <Buildings stripe={stripe} horizontal={horizontal} count={ts.buildings} />
       )}
-      {owner && <rect x={band.x} y={band.y} width={band.w} height={band.h} fill={owner.color} />}
+      {owner && (
+        <rect
+          className="owner-band"
+          x={band.x}
+          y={band.y}
+          width={band.w}
+          height={band.h}
+          rx={2.5}
+          fill={owner.color}
+        />
+      )}
       {tile.image && (
         <image
           href={tile.image}
@@ -288,11 +316,11 @@ function TileView({
       <Tokens players={players} labels={labels} area={content} style={tokens} />
       <rect
         className="tile-outline"
-        x={x}
-        y={y}
-        width={w}
-        height={h}
-        rx={rect.side === 'none' ? 8 : 0}
+        x={x + GAP}
+        y={y + GAP}
+        width={w - 2 * GAP}
+        height={h - 2 * GAP}
+        rx={8}
       />
     </g>
   );
@@ -364,10 +392,10 @@ function Tokens({
           <g key={p.id} className={`token${p.inJail ? ' jailed' : ''}`}>
             <title>{p.name}</title>
             {style === 'pawns' ? (
-              <path
-                d={`M ${cx} ${cy - TOKEN_R} a 4 4 0 1 1 0.01 0 Z M ${cx - 4} ${cy - 2} h 8 l 3 ${TOKEN_R + 1} h -14 Z`}
-                fill={p.color}
-              />
+              <g className="pawn" fill={p.color}>
+                <circle cx={cx} cy={cy - TOKEN_R + 4.5} r={4.8} />
+                <path d={`M ${cx - 8} ${cy + TOKEN_R - 1} q 0 -11 8 -13 q 8 2 8 13 z`} />
+              </g>
             ) : (
               <circle cx={cx} cy={cy} r={TOKEN_R} fill={p.color} />
             )}
@@ -405,6 +433,9 @@ function BoardCenter({
   const deck = lastCard ? state.pack.decks.find((d) => d.id === lastCard.deckId) : undefined;
   const supply = (n: number | null) => (n === null ? t('center.unlimited') : n);
   const image = state.pack.theme?.centerImage;
+  // Neuer Schlüssel bei jedem Wurf, damit die Würfel-Animation erneut läuft.
+  let rollKey = events.length - 1;
+  while (rollKey >= 0 && events[rollKey]!.type !== 'diceRolled') rollKey--;
 
   return (
     <foreignObject x={rect.x} y={rect.y} width={rect.w} height={rect.h}>
@@ -422,11 +453,15 @@ function BoardCenter({
           </div>
         )}
         {state.lastRoll && (
-          <div className="center-dice" aria-label={state.lastRoll.dice.join(' + ')}>
+          <div key={rollKey} className="center-dice" aria-label={state.lastRoll.dice.join(' + ')}>
             {state.lastRoll.dice.map((d, i) => (
-              <span key={i} className={state.dice.sides === 6 ? 'die-face' : 'die-number'}>
-                {diceFace(d, state.dice.sides)}
-              </span>
+              <Die
+                key={i}
+                value={d}
+                sides={state.dice.sides}
+                size={58}
+                double={state.lastRoll!.isDouble}
+              />
             ))}
           </div>
         )}

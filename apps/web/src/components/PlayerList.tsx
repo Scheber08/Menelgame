@@ -1,6 +1,8 @@
 import { actingPlayerId, netWorth, ownedTiles, type GameState } from '@menelgame/engine';
 import { useTranslation } from 'react-i18next';
 import { formatMoney } from '../game/format';
+import { Avatar } from './Avatar';
+import { Icon } from './Icon';
 
 interface PlayerListProps {
   state: GameState;
@@ -27,7 +29,10 @@ export function PlayerList({
 
   return (
     <section className="panel">
-      <h2>{t('players.heading')}</h2>
+      <h2>
+        <Icon name="players" />
+        {t('players.heading')}
+      </h2>
       <ul className="player-list">
         {state.players.map((p) => {
           const tiles = ownedTiles(state, p.id);
@@ -37,7 +42,7 @@ export function PlayerList({
               className={`player${p.id === acting ? ' acting' : ''}${p.bankrupt ? ' bankrupt' : ''}`}
             >
               <div className="player-row">
-                <span className="dot" style={{ background: p.color }} />
+                <Avatar name={p.name} color={p.color} />
                 <span className="player-name">{p.name}</span>
                 {p.id === me && <span className="badge">{t('players.you')}</span>}
                 {!p.bankrupt &&

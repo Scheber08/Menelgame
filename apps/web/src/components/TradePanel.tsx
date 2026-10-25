@@ -16,6 +16,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { describeTerm, formatMoney, playerName, tileName } from '../game/format';
 import { NumberField } from './fields';
+import { Icon } from './Icon';
 
 interface TradePanelProps {
   state: GameState;
@@ -82,7 +83,10 @@ export function TradePanel({ state, controls, dispatch }: TradePanelProps) {
   return (
     <section className="panel trade-panel">
       <div className="panel-header">
-        <h2>{t('trade.heading')}</h2>
+        <h2>
+          <Icon name="trade" />
+          {t('trade.heading')}
+        </h2>
         {tradingOpen && proposers.length > 0 && !draft && active.length > 1 && (
           <button type="button" onClick={startDraft}>
             {t('trade.new')}

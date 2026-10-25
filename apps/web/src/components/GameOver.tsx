@@ -1,6 +1,16 @@
 import { netWorth, type GameEvent, type GameState } from '@menelgame/engine';
 import { useTranslation } from 'react-i18next';
 import { formatMoney, playerName } from '../game/format';
+import { Avatar } from './Avatar';
+import { Icon } from './Icon';
+
+/** Feste Konfetti-Stücke: Position, Farbe, Verzögerung, Drehung. */
+const CONFETTI = Array.from({ length: 24 }, (_, i) => ({
+  x: (i * 37) % 100,
+  color: ['#ffc83d', '#ff6b5b', '#1fa971', '#4aa3ff', '#9b6dff'][i % 5]!,
+  delay: (i % 6) * 0.18,
+  turn: (i * 47) % 360,
+}));
 
 interface GameOverProps {
   state: GameState;
@@ -18,20 +28,34 @@ export function GameOver({ state, events, onClose, onNewGame, onReplay }: GameOv
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
-      <div className="dialog">
-        <h2 id="game-over-title">
-          {winner && <span className="dot large" style={{ background: winner.color }} />}
-          {t('gameOver.heading', { winner: winner?.name ?? '–' })}
-        </h2>
+      <div className="dialog game-over">
+        <div className="confetti" aria-hidden="true">
+          {CONFETTI.map((c, i) => (
+            <span
+              key={i}
+              style={{
+                left: `${c.x}%`,
+                background: c.color,
+                animationDelay: `${c.delay}s`,
+                transform: `rotate(${c.turn}deg)`,
+              }}
+            />
+          ))}
+        </div>
+        <span className="trophy" aria-hidden="true">
+          <Icon name="trophy" size={40} />
+        </span>
+        <h2 id="game-over-title">{t('gameOver.heading', { winner: winner?.name ?? '–' })}</h2>
         <p className="muted">{t(`gameOver.reason_${end.reason}`)}</p>
         <h3>{t('gameOver.ranking')}</h3>
         <ol className="ranking">
-          {end.ranking.map((r) => {
+          {end.ranking.map((r, i) => {
             const p = state.players.find((x) => x.id === r.playerId);
             return (
-              <li key={r.playerId}>
-                <span className="dot" style={{ background: p?.color }} />
-                <span>{playerName(state, r.playerId)}</span>
+              <li key={r.playerId} className={i === 0 ? 'first' : undefined}>
+                <span className="rank">{i + 1}</span>
+                <Avatar name={playerName(state, r.playerId)} color={p?.color ?? '#999999'} />
+                <span className="ranking-name">{playerName(state, r.playerId)}</span>
                 <span className="muted">
                   {p?.bankrupt
                     ? t('players.bankrupt')

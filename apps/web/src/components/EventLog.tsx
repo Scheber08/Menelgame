@@ -3,6 +3,7 @@ import { publicGameState } from '@menelgame/protocol';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatEvent } from '../game/format';
+import { Icon } from './Icon';
 
 interface EventLogProps {
   state: GameState;
@@ -60,7 +61,10 @@ export function EventLog({ state, events, log, exportHref }: EventLogProps) {
   return (
     <section className="panel log-panel">
       <div className="panel-header">
-        <h2>{t('log.heading')}</h2>
+        <h2>
+          <Icon name="list" />
+          {t('log.heading')}
+        </h2>
         <div className="log-tools">
           {(log || exportHref) && (
             <button type="button" className="link" onClick={() => void verify()}>

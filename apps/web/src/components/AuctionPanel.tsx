@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatMoney, playerName, tileName } from '../game/format';
 import { Countdown } from './Countdown';
+import { Icon } from './Icon';
 
 interface AuctionPanelProps {
   state: GameState;
@@ -28,7 +29,10 @@ export function AuctionPanel({ state, controls, dispatch, deadline, onClose }: A
   return (
     <section className="panel auction-panel" aria-live="polite">
       <div className="panel-header">
-        <h2>{t('auction.heading', { tile: tileName(state, auction.tileId) })}</h2>
+        <h2>
+          <Icon name="gavel" />
+          {t('auction.heading', { tile: tileName(state, auction.tileId) })}
+        </h2>
         {deadline && <Countdown at={deadline} />}
       </div>
       <p className="muted small">{t('auction.listPrice', { price: formatMoney(t, price) })}</p>

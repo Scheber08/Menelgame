@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Icon, Logo, type IconName } from './components/Icon';
 import { HotSeatPage } from './pages/HotSeatPage';
 import { Home } from './pages/Home';
 import { MyPacksPage } from './pages/MyPacksPage';
@@ -8,16 +9,29 @@ import { SharedPackPage } from './pages/SharedPackPage';
 import { StatsPage } from './pages/StatsPage';
 import { navigate, usePath } from './router';
 
-function NavLink({ to, children }: { to: string; children: string }) {
+function NavLink({
+  to,
+  icon,
+  active,
+  children,
+}: {
+  to: string;
+  icon: IconName;
+  active: boolean;
+  children: string;
+}) {
   return (
     <a
       href={to}
+      className={active ? 'active' : undefined}
+      aria-current={active ? 'page' : undefined}
       onClick={(e) => {
         e.preventDefault();
         navigate(to);
       }}
     >
-      {children}
+      <Icon name={icon} size={18} />
+      <span>{children}</span>
     </a>
   );
 }
@@ -49,21 +63,26 @@ export function App() {
             navigate('/');
           }}
         >
-          <span className="logo" aria-hidden="true">
-            M
-          </span>
+          <Logo className="logo" />
           <div>
-            <div className="brand-name">{t('app.title')}</div>
-            <div className="muted small">{t('app.tagline')}</div>
+            <div className="brand-name">
+              Menel<span>game</span>
+            </div>
+            <div className="muted small brand-tagline">{t('app.tagline')}</div>
           </div>
         </a>
         <nav className="header-nav">
           {room && <span className="header-code">{room[1]!.toUpperCase()}</span>}
-          <NavLink to="/statistik">{t('nav.stats')}</NavLink>
-          <NavLink to="/packs">{t('nav.packs')}</NavLink>
+          <NavLink to="/statistik" icon="trophy" active={path.startsWith('/statistik')}>
+            {t('nav.stats')}
+          </NavLink>
+          <NavLink to="/packs" icon="layers" active={path.startsWith('/packs')}>
+            {t('nav.packs')}
+          </NavLink>
         </nav>
       </header>
       {page}
+      {!room && <footer className="app-footer">{t('app.footer')}</footer>}
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { actingPlayerId, type Action, type GameState, type PlayerAction } from '
 import { useTranslation } from 'react-i18next';
 import { formatMoney, partyName, tileName } from '../game/format';
 import { Countdown } from './Countdown';
+import { Avatar } from './Avatar';
+import { Icon } from './Icon';
 
 export interface UiError {
   code: string;
@@ -118,7 +120,7 @@ export function ActionBar({ state, legal, canAct, error, dispatch, turnDeadline 
   return (
     <section className={`panel turn-panel${canAct ? ' my-turn' : ''}`} aria-live="polite">
       <div className="turn-header">
-        <span className="dot large" style={{ background: actor.color }} />
+        <Avatar name={actor.name} color={actor.color} size="large" />
         <div>
           <div className="turn-label">{t('turn.heading')}</div>
           <div className="turn-name">
@@ -140,13 +142,14 @@ export function ActionBar({ state, legal, canAct, error, dispatch, turnDeadline 
               type="button"
               className={
                 action.type === primary && action.type !== 'CHOOSE'
-                  ? 'primary'
+                  ? `primary${action.type === 'ROLL_DICE' ? ' big icon-button' : ''}`
                   : action.type === 'DECLARE_BANKRUPTCY'
                     ? 'danger'
                     : ''
               }
               onClick={() => run(action)}
             >
+              {action.type === 'ROLL_DICE' && <Icon name="dice" size={22} />}
               {label(action)}
             </button>
           ))}
