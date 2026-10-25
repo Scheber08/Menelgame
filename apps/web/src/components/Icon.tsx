@@ -135,6 +135,44 @@ const ICONS = {
       <path d="M12 7.5V12l3 2" />
     </>
   ),
+  train: (
+    <>
+      <rect x="5.5" y="3.5" width="13" height="13" rx="3.5" />
+      <path d="M5.5 10h13" />
+      <circle cx="9" cy="13.4" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="13.4" r="0.9" fill="currentColor" stroke="none" />
+      <path d="M8.5 16.5 6.5 20.5M15.5 16.5l2 4M7.5 18.5h9" />
+    </>
+  ),
+  bolt: <path d="M13.5 3 5.5 13.5h6L10.5 21l8-10.5h-6z" />,
+  bars: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <path d="M9 4v16M15 4v16M4 12h16" />
+    </>
+  ),
+  tree: (
+    <>
+      <path d="M12 3.5c3.2 0 5.5 2.6 5.5 5.6 0 3.2-2.5 5.4-5.5 5.4s-5.5-2.2-5.5-5.4c0-3 2.3-5.6 5.5-5.6z" />
+      <path d="M12 14.5V20M8.5 20.5h7M12 17l-2.3-2" />
+    </>
+  ),
+  siren: (
+    <>
+      <path d="M6.5 17.5V13a5.5 5.5 0 0 1 11 0v4.5" />
+      <path d="M4.5 17.5h15v3h-15z" />
+      <path d="M12 2.5v2M4.2 5.7l1.4 1.4M19.8 5.7l-1.4 1.4" />
+      <path d="M10 13a2 2 0 0 1 2-2" />
+    </>
+  ),
+  arrowLeft: <path d="M19.5 12h-15M10.5 6l-6 6 6 6" />,
+  coffee: (
+    <>
+      <path d="M5 9.5h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z" />
+      <path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16" />
+      <path d="M8.5 3.5c-.8 1 .8 2 0 3M12 3.5c-.8 1 .8 2 0 3" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof ICONS;

@@ -3,11 +3,14 @@ import { isOwnable, type Theme, type Tile } from '@menelgame/schema';
 import { useMemo, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Die } from '../components/Die';
+import { Icon, Logo, type IconName } from '../components/Icon';
 import { formatMoney } from '../game/format';
 import { boardGeometry, type Side, type TileRect } from './geometry';
 
 const STRIPE = 20;
-const OWNER_BAND = 5;
+const OWNER_BAND = 6;
+/** Platz, den das Besitzerband samt Abstand am Rand belegt. */
+const BAND_SPACE = OWNER_BAND + 3.5;
 const TOKEN_R = 11;
 /** Abstand zwischen den Feldern und Innenabstand der Streifen. */
 const GAP = 1.5;
@@ -66,6 +69,9 @@ export function Board({ state, events, selectedTileId, onSelectTile, positions }
     state.players.filter((p) => !p.bankrupt && (positions?.[p.id] ?? p.position) === index);
   const current = state.players[state.currentPlayer];
   const labels = useMemo(() => tokenLabels(state.players), [state.players]);
+  // Feld, auf dem der Spieler am Zug gerade steht (mit Animation: wo seine Figur gerade ist).
+  const active = state.phase.name !== 'gameOver' && current && !current.bankrupt ? current : null;
+  const hereIndex = active ? (positions?.[active.id] ?? active.position) : -1;
   const theme = pack.theme;
 
   return (
@@ -95,6 +101,10 @@ export function Board({ state, events, selectedTileId, onSelectTile, positions }
         >
           <rect width="6" height="12" className="blocked-stripe" />
         </pattern>
+        <pattern id="board-dots" width="14" height="14" patternUnits="userSpaceOnUse">
+          <circle cx="3" cy="3" r="1.3" className="board-dot" />
+          <circle cx="10" cy="10" r="1.3" className="board-dot" />
+        </pattern>
       </defs>
       <rect
         className="board-bg"
@@ -103,6 +113,15 @@ export function Board({ state, events, selectedTileId, onSelectTile, positions }
         width={geometry.width}
         height={geometry.height}
         rx={22}
+      />
+      <rect
+        className="board-pattern"
+        x={0}
+        y={0}
+        width={geometry.width}
+        height={geometry.height}
+        rx={22}
+        fill="url(#board-dots)"
       />
       <BoardCenter state={state} events={events} rect={geometry.center} current={current} />
       {geometry.tiles.map((rect) => {
@@ -124,6 +143,8 @@ export function Board({ state, events, selectedTileId, onSelectTile, positions }
             labels={labels}
             tokens={theme?.tokens ?? 'initials'}
             selected={selectedTileId === tile.id}
+            here={rect.index === hereIndex ? (active?.color ?? null) : null}
+            currentId={active?.id ?? null}
             onSelect={() => onSelectTile(tile.id)}
           />
         );
@@ -150,19 +171,21 @@ function tileParts(rect: TileRect, hasStripe: boolean) {
     right: { x, y, w: STRIPE, h },
     none: { x, y, w, h: STRIPE * 0.8 },
   };
+  // Besitzerband am äußeren Rand, mit etwas Abstand zur Feldkante.
+  const e = INSET;
   const band: Record<Side, Box> = {
-    bottom: { x, y: y + h - OWNER_BAND, w, h: OWNER_BAND },
-    top: { x, y, w, h: OWNER_BAND },
-    left: { x, y, w: OWNER_BAND, h },
-    right: { x: x + w - OWNER_BAND, y, w: OWNER_BAND, h },
-    none: { x, y: y + h - OWNER_BAND, w, h: OWNER_BAND },
+    bottom: { x: x + e, y: y + h - OWNER_BAND - e, w: w - 2 * e, h: OWNER_BAND },
+    top: { x: x + e, y: y + e, w: w - 2 * e, h: OWNER_BAND },
+    left: { x: x + e, y: y + e, w: OWNER_BAND, h: h - 2 * e },
+    right: { x: x + w - OWNER_BAND - e, y: y + e, w: OWNER_BAND, h: h - 2 * e },
+    none: { x: x + e, y: y + h - OWNER_BAND - e, w: w - 2 * e, h: OWNER_BAND },
   };
   const content: Record<Side, Box> = {
-    bottom: { x, y: y + STRIPE, w, h: h - STRIPE - OWNER_BAND },
-    top: { x, y: y + OWNER_BAND, w, h: h - STRIPE - OWNER_BAND },
-    left: { x: x + OWNER_BAND, y, w: w - STRIPE - OWNER_BAND, h },
-    right: { x: x + STRIPE, y, w: w - STRIPE - OWNER_BAND, h },
-    none: { x, y: y + STRIPE * 0.8, w, h: h - STRIPE * 0.8 - OWNER_BAND },
+    bottom: { x, y: y + STRIPE, w, h: h - STRIPE - BAND_SPACE },
+    top: { x, y: y + BAND_SPACE, w, h: h - STRIPE - BAND_SPACE },
+    left: { x: x + BAND_SPACE, y, w: w - STRIPE - BAND_SPACE, h },
+    right: { x: x + STRIPE, y, w: w - STRIPE - BAND_SPACE, h },
+    none: { x, y: y + STRIPE * 0.8, w, h: h - STRIPE * 0.8 - BAND_SPACE },
   };
   const inset = (b: Box): Box => ({
     x: b.x + INSET,
@@ -172,7 +195,7 @@ function tileParts(rect: TileRect, hasStripe: boolean) {
   });
   return {
     stripe: inset(stripe[side]),
-    band: inset(band[side]),
+    band: band[side],
     content: hasStripe ? content[side] : { x, y, w, h },
   };
 }
@@ -186,7 +209,33 @@ interface TileViewProps {
   labels: Map<string, string>;
   tokens: Theme['tokens'];
   selected: boolean;
+  /** Farbe des Spielers am Zug, wenn er auf diesem Feld steht. */
+  here: string | null;
+  currentId: string | null;
   onSelect: () => void;
+}
+
+/** Symbol je Feldtyp; Grundstücke haben stattdessen den Farbstreifen. */
+const TILE_ICONS: Partial<Record<Tile['type'], IconName>> = {
+  station: 'train',
+  utility: 'bolt',
+  tax: 'coins',
+  jail: 'bars',
+  freeParking: 'coffee',
+  goToJail: 'siren',
+  start: 'arrowLeft',
+  custom: 'sparkles',
+};
+
+/** Typname unter eigenen Feldern – nur, wenn er nicht schon im Feldnamen steckt. */
+function customSubtitle(name: string, typeName: string | undefined): string | null {
+  if (!typeName || name.toLowerCase().includes(typeName.toLowerCase())) return null;
+  return typeName;
+}
+
+/** Leichte Tönung der Feldfläche in der Gruppen-, Typ- oder Stapelfarbe. */
+function tint(color: string | undefined, percent: number): CSSProperties | undefined {
+  return color ? { fill: `color-mix(in srgb, ${color} ${percent}%, var(--tile-bg))` } : undefined;
 }
 
 function TileView({
@@ -198,6 +247,8 @@ function TileView({
   labels,
   tokens,
   selected,
+  here,
+  currentId,
   onSelect,
 }: TileViewProps) {
   const { t } = useTranslation();
@@ -215,14 +266,19 @@ function TileView({
       : tile.type === 'tax'
         ? formatMoney(t, tile.amount)
         : tile.type === 'custom'
-          ? (state.pack.tileTypes.find((x) => x.id === tile.tileType)?.name ?? null)
+          ? customSubtitle(
+              tile.name,
+              state.pack.tileTypes.find((x) => x.id === tile.tileType)?.name,
+            )
           : null;
   const deck = tile.type === 'card' ? state.pack.decks.find((d) => d.id === tile.deck) : undefined;
   const corner = rect.corner || rect.side === 'none';
+  const icon = TILE_ICONS[tile.type];
+  const fill = deck ? tint(deck.color, 12) : tint(color, tile.type === 'custom' ? 18 : 15);
 
   return (
     <g
-      className={`tile tile-${tile.type}${selected ? ' selected' : ''}`}
+      className={`tile tile-${tile.type}${rect.corner ? ' corner' : ''}${selected ? ' selected' : ''}`}
       role="button"
       tabIndex={0}
       aria-label={tile.name}
@@ -241,17 +297,28 @@ function TileView({
         width={w - 2 * GAP}
         height={h - 2 * GAP}
         rx={8}
+        style={fill}
       />
       {hasStripe && (
-        <rect
-          className="tile-stripe"
-          x={stripe.x}
-          y={stripe.y}
-          width={stripe.w}
-          height={stripe.h}
-          rx={5}
-          fill={color}
-        />
+        <>
+          <rect
+            className="tile-stripe"
+            x={stripe.x}
+            y={stripe.y}
+            width={stripe.w}
+            height={stripe.h}
+            rx={5}
+            fill={color}
+          />
+          <rect
+            className="stripe-gloss"
+            x={stripe.x + 2}
+            y={stripe.y + 1.5}
+            width={horizontal ? stripe.w - 4 : stripe.w * 0.4}
+            height={horizontal ? stripe.h * 0.4 : stripe.h - 3}
+            rx={3}
+          />
+        </>
       )}
       {hasStripe && ts && ts.buildings > 0 && (
         <Buildings stripe={stripe} horizontal={horizontal} count={ts.buildings} />
@@ -285,8 +352,16 @@ function TileView({
       >
         <div className={`tile-label${corner && !tile.image ? ' corner' : ''}`} lang="de">
           {deck && !tile.image && (
-            <span className="tile-symbol" style={{ color: deck.color }}>
+            <span className="tile-minicard" style={{ background: deck.color }} aria-hidden="true">
               ?
+            </span>
+          )}
+          {icon && !tile.image && (
+            <span
+              className={`tile-icon${corner ? ' big' : ''}`}
+              style={tile.type === 'custom' && color ? { color } : undefined}
+            >
+              <Icon name={icon} size={corner ? 30 : 17} />
             </span>
           )}
           <span
@@ -313,7 +388,24 @@ function TileView({
           <title>{t('tile.blocked')}</title>
         </rect>
       )}
-      <Tokens players={players} labels={labels} area={content} style={tokens} />
+      <Tokens
+        players={players}
+        labels={labels}
+        area={content}
+        style={tokens}
+        currentId={currentId}
+      />
+      {here && (
+        <rect
+          className="tile-here"
+          x={x + GAP}
+          y={y + GAP}
+          width={w - 2 * GAP}
+          height={h - 2 * GAP}
+          rx={8}
+          stroke={here}
+        />
+      )}
       <rect
         className="tile-outline"
         x={x + GAP}
@@ -336,20 +428,31 @@ function Buildings({
   count: number;
 }) {
   if (count === HOTEL) {
-    const size = { w: horizontal ? 26 : 12, h: horizontal ? 12 : 26 };
+    // Breites Hotel auf waagrechten Streifen, hohes auf senkrechten.
+    const hw = horizontal ? 28 : 17;
+    const hh = horizontal ? 16 : 26;
+    const roof = horizontal ? 6 : 7;
+    const hx = stripe.x + (stripe.w - hw) / 2;
+    const hy = stripe.y + (stripe.h - hh) / 2;
     return (
-      <rect
-        className="hotel"
-        x={stripe.x + (stripe.w - size.w) / 2}
-        y={stripe.y + (stripe.h - size.h) / 2}
-        width={size.w}
-        height={size.h}
-        rx={2}
-      />
+      <g className="hotel-group">
+        <path
+          className="hotel"
+          d={`M ${hx} ${hy + roof} L ${hx + hw / 2} ${hy} L ${hx + hw} ${hy + roof} V ${hy + hh} H ${hx} Z`}
+        />
+        <rect
+          className="hotel-door"
+          x={hx + hw / 2 - 2.5}
+          y={hy + hh - 6}
+          width={5}
+          height={6}
+          rx={1}
+        />
+      </g>
     );
   }
-  const size = 10;
-  const gap = 3;
+  const size = 13;
+  const gap = 1.5;
   const total = count * size + (count - 1) * gap;
   return (
     <>
@@ -361,7 +464,13 @@ function Buildings({
         const hy = horizontal
           ? stripe.y + (stripe.h - size) / 2
           : stripe.y + (stripe.h - total) / 2 + offset;
-        return <rect key={i} className="house" x={hx} y={hy} width={size} height={size} rx={1.5} />;
+        return (
+          <path
+            key={i}
+            className="house"
+            d={`M ${hx} ${hy + size * 0.45} L ${hx + size / 2} ${hy} L ${hx + size} ${hy + size * 0.45} V ${hy + size} H ${hx} Z`}
+          />
+        );
       })}
     </>
   );
@@ -372,11 +481,13 @@ function Tokens({
   labels,
   area,
   style,
+  currentId,
 }: {
   players: Player[];
   labels: Map<string, string>;
   area: Box;
   style: Theme['tokens'];
+  currentId: string | null;
 }) {
   if (players.length === 0) return null;
   const perRow = Math.max(1, Math.floor((area.w - 4) / (TOKEN_R * 2 + 2)));
@@ -389,8 +500,14 @@ function Tokens({
         const cy = area.y + area.h - 4 - TOKEN_R - row * (TOKEN_R * 2 + 2);
         const label = labels.get(p.id) ?? '?';
         return (
-          <g key={p.id} className={`token${p.inJail ? ' jailed' : ''}`}>
+          <g
+            key={p.id}
+            className={`token${p.inJail ? ' jailed' : ''}${p.id === currentId ? ' current' : ''}`}
+          >
             <title>{p.name}</title>
+            {p.id === currentId && (
+              <circle className="token-halo" cx={cx} cy={cy} r={TOKEN_R + 3} fill={p.color} />
+            )}
             {style === 'pawns' ? (
               <g className="pawn" fill={p.color}>
                 <circle cx={cx} cy={cy - TOKEN_R + 4.5} r={4.8} />
@@ -443,7 +560,10 @@ function BoardCenter({
         {image ? (
           <img className="center-image" src={image} alt="" />
         ) : (
-          <div className="center-title">Menelgame</div>
+          <div className="center-brand">
+            <Logo className="center-logo" />
+            <div className="center-title">Menelgame</div>
+          </div>
         )}
         <div className="center-pack">{state.pack.meta.name}</div>
         {current && state.phase.name !== 'gameOver' && (

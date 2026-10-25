@@ -505,7 +505,163 @@ input[type='color'] {
 }
 
 .tile:hover .tile-bg {
-  fill: color-mix(in srgb, var(--tile-bg) 88%, var(--accent));
+  filter: brightness(0.95) saturate(1.15);
+}
+
+.tile:hover .tile-outline {
+  stroke: color-mix(in srgb, var(--accent) 60%, var(--tile-border));
+  stroke-width: 2.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tile:hover .tile-bg {
+    filter: brightness(1.2);
+  }
+}
+
+.board-pattern {
+  pointer-events: none;
+}
+
+.board-dot {
+  fill: rgba(255, 255, 255, 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  .board-dot {
+    fill: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Ecken und Sonderfelder in eigenen Farben */
+.tile-start .tile-bg {
+  fill: color-mix(in srgb, var(--accent) 24%, var(--tile-bg));
+}
+
+.tile-jail .tile-bg {
+  fill: color-mix(in srgb, var(--sun) 30%, var(--tile-bg));
+}
+
+.tile-freeParking .tile-bg {
+  fill: color-mix(in srgb, var(--sky) 22%, var(--tile-bg));
+}
+
+.tile-goToJail .tile-bg {
+  fill: color-mix(in srgb, var(--coral) 24%, var(--tile-bg));
+}
+
+.tile-station .tile-bg,
+.tile-utility .tile-bg,
+.tile-tax .tile-bg {
+  fill: color-mix(in srgb, var(--board-text, var(--text)) 5%, var(--tile-bg));
+}
+
+.tile-start .tile-icon {
+  color: var(--accent-strong);
+}
+
+.tile-jail .tile-icon {
+  color: color-mix(in srgb, var(--sun-strong) 70%, var(--text));
+}
+
+.tile-freeParking .tile-icon {
+  color: var(--sky);
+}
+
+.tile-goToJail .tile-icon {
+  color: var(--coral-strong);
+}
+
+.tile-utility .tile-icon {
+  color: var(--sun-strong);
+}
+
+.tile-tax .tile-icon {
+  color: var(--coral-strong);
+}
+
+.tile-station .tile-icon {
+  color: color-mix(in srgb, var(--board-text, var(--text)) 70%, transparent);
+}
+
+.tile-icon {
+  display: grid;
+  place-items: center;
+  margin-bottom: 2px;
+}
+
+.tile-icon.big {
+  margin-bottom: 4px;
+  animation: corner-bob 3.2s ease-in-out infinite;
+}
+
+.tile-goToJail .tile-icon.big {
+  animation: siren 1.8s ease-in-out infinite;
+}
+
+@keyframes corner-bob {
+  50% {
+    transform: translateY(-3px) rotate(-4deg);
+  }
+}
+
+@keyframes siren {
+  0%,
+  70%,
+  100% {
+    transform: none;
+  }
+  80% {
+    transform: rotate(-12deg);
+  }
+  90% {
+    transform: rotate(12deg);
+  }
+}
+
+/* Kartenfeld: kleine, schwebende Karte im Stapel-Farbton */
+.tile-minicard {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 22px;
+  margin: 1px 0 3px;
+  border-radius: 4px;
+  border: 1.5px solid #fff;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 1.5px 1.5px 0 rgba(0, 0, 0, 0.18);
+  transform: rotate(-8deg);
+  animation: card-float 2.8s ease-in-out infinite;
+}
+
+@keyframes card-float {
+  50% {
+    transform: rotate(6deg) translateY(-2px);
+  }
+}
+
+.stripe-gloss {
+  fill: #fff;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Feld des Spielers am Zug: pulsierender Rahmen in seiner Farbe */
+.tile-here {
+  fill: none;
+  stroke-width: 3.5;
+  pointer-events: none;
+  animation: here-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes here-pulse {
+  50% {
+    stroke-opacity: 0.3;
+  }
 }
 
 .tile.selected .tile-outline {
@@ -557,11 +713,17 @@ input[type='color'] {
   font-weight: 700;
 }
 
-.tile-symbol {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
+.center-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.center-logo {
+  width: 64px;
+  height: 64px;
+  animation: corner-bob 4s ease-in-out infinite;
 }
 
 .mortgaged {
@@ -585,11 +747,42 @@ input[type='color'] {
   stroke-width: 2;
 }
 
+.hotel-door {
+  fill: #fff;
+  opacity: 0.85;
+}
+
+.house,
+.hotel {
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+
 .token circle,
 .token .pawn {
   stroke: #fff;
   stroke-width: 2.5;
   filter: drop-shadow(0 2px 1.5px rgba(0, 0, 0, 0.35));
+}
+
+.token .token-halo {
+  stroke: none;
+  filter: none;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: halo 1.5s ease-out infinite;
+}
+
+@keyframes halo {
+  from {
+    transform: scale(0.8);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(1.6);
+    opacity: 0;
+  }
 }
 
 .token.jailed circle,
@@ -2540,4 +2733,14 @@ details[open] > summary::before {
 
 .swatch.active {
   transform: scale(1.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-icon.big,
+  .tile-minicard,
+  .tile-here,
+  .token .token-halo,
+  .center-logo {
+    animation: none;
+  }
 }
