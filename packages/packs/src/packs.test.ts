@@ -38,6 +38,14 @@ describe('Mitgelieferte Packs', () => {
     }
   });
 
+  it('haben auf quadratischen Brettern keine Grundstücke in den Ecken', () => {
+    for (const pack of builtInPacks.filter((p) => p.layout.shape === 'square')) {
+      const n = pack.tiles.length;
+      const corners = [0, n / 4, n / 2, (3 * n) / 4].map((i) => pack.tiles[i]!);
+      expect(corners.filter((t) => 'price' in t).map((t) => `${pack.meta.id}:${t.id}`)).toEqual([]);
+    }
+  });
+
   it('Wien-Edition und Fantasy-Welt', () => {
     expect(wienPack.tiles).toHaveLength(40);
     expect(fantasyPack.tiles).toHaveLength(32);

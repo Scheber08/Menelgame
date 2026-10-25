@@ -334,6 +334,11 @@
       "tileType": "portal"
     },
     {
+      "id": "kerker",
+      "name": "Kerker",
+      "type": "jail"
+    },
+    {
       "id": "mondlichtung",
       "name": "Mondlichtung",
       "type": "property",
@@ -350,11 +355,6 @@
       "price": 120,
       "houseCost": 50,
       "rent": [9, 45, 110, 310, 450, 600]
-    },
-    {
-      "id": "kerker",
-      "name": "Kerker",
-      "type": "jail"
     },
     {
       "id": "zwergenmine",
