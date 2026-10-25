@@ -72,6 +72,12 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.3.1)
+      '@fontsource-variable/fredoka':
+        specifier: 5.2.8
+        version: 5.2.8
+      '@fontsource-variable/nunito':
+        specifier: 5.2.6
+        version: 5.2.6
       '@menelgame/bots':
         specifier: workspace:*
         version: link:../../packages/bots
@@ -517,6 +523,12 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@fontsource-variable/fredoka@5.2.8':
+    resolution: {integrity: sha512-oIkGpZS+s0eZhoBzALKENP15KDu9031UNIAp2ZNkKzLDg2f6s7Q4lW4atPx9KxLloQCUZMNGkoitXXGyIhRa2Q==}
+
+  '@fontsource-variable/nunito@5.2.6':
+    resolution: {integrity: sha512-dGYTQ0Hl94jjfMraYefrURHGH8fk/vL/1zYAZGofiPJVs6C0OkM8T87Te5Gwrbe6HG/XEMm5lib8AqasTN3ucw==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2041,6 +2053,10 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@fontsource-variable/fredoka@5.2.8': {}
+
+  '@fontsource-variable/nunito@5.2.6': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
