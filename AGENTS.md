@@ -139,6 +139,13 @@ docs/                 KONZEPT.md, ENTSCHEIDUNGEN.md
 - **Phase 5 umgesetzt:** Brett-Editor (Felder ziehen, einfügen, löschen; Formen Quadrat, Rechteck, Ring, Pfad), Effekt-Baukasten für eigene Feldtypen mit Vorlagen (Teleporter, Kreuzung, Baustelle), Aussehen und Bilder (R2), Testmodus gegen Bots im Browser, Zufallsbrett-Generator.
 - **Phase 6 umgesetzt:** Vereinbarungen im Handel (Mietfreiheit, Ratenzahlung, Gewinnbeteiligung), Bot Schwer, Figuren laufen Feld für Feld, abschaltbare Töne, Replay-Ansicht, Statistik mit Erfolgen und Titeln in D1, Variablen für eigene Feldtypen, Packs Wien-Edition und Fantasy-Welt.
 
+## Gestaltung (Web)
+
+- Farben, Radien und Schatten nur über die CSS-Variablen oben in `apps/web/src/styles.css` (hell und dunkel). Packs dürfen nur Brettfarben überschreiben (`--board-*`, `--tile-*`).
+- Schriften: Nunito (Text) und Fredoka (Überschriften, Zahlen auf dem Brett), mitgeliefert über `@fontsource-variable` – keine externen Schrift-Server.
+- Icons sind eigene SVGs in `components/Icon.tsx`; Würfel in `components/Die.tsx`, Spielerköpfe in `components/Avatar.tsx`.
+- Animationen respektieren `prefers-reduced-motion`.
+
 ## Arbeitsweise
 
 - Kleine, nachvollziehbare Commits mit aussagekräftigen Nachrichten.
